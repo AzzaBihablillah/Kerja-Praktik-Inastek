@@ -61,7 +61,7 @@ def non_max_suppression(
     """Runs Non-Maximum Suppression (NMS) on inference results
 
     Returns:
-        list of detections, on (n,6) tensor per image [xyxy, conf, cls]
+        list of detections, on (n,6) tensor per image [xyxy, cls]
     """
 
     # yolov8 and onwards have [batchSize, number of classes + 4, 8400]
