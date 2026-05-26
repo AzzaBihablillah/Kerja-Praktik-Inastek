@@ -10,7 +10,7 @@ import time
 from datetime import date, datetime
 import threading
 import queue
-from utils.run_models import Models, MODEL_DETECTION_TYPE, MODEL_CLASSIFICATION_TYPE
+from utils.run_models import Models, MODEL_DETECTION_TYPE, MODEL_CLASSIFICATION_TYPE, MODEL_SEGMENTATION_TYPE
 import numpy as np
 from datetime import datetime
 from copy import deepcopy
@@ -100,8 +100,7 @@ class VideoCapture:
         return self
 
     def __exit__(self, exc_type, exc, tb):
-        self._stop.set()
-        self._thread.join(timeout=3.0)
+        self.stop()
         return False
     
 
@@ -112,12 +111,17 @@ if __name__ == "__main__":
     # micro = Micro()
 
     capture = VideoCapture(1)
+    frame_height = capture.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+    frame_width = capture.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+
+    # print(frame_height, frame_width)
 
     while True:
         frame_bgr = capture.read_frame()
         result = models.predict(frame_bgr, model_index=0)
-        print(result)
+        
         if result is not None:
+            # print(result.shape)
             for i in range(result.shape[0]):
                 annotated_frame = cv2.rectangle(
                                                 frame_bgr, 
@@ -136,10 +140,12 @@ if __name__ == "__main__":
                                             (0, 0, 255), 
                                             2
                                     )
+                
+        
 
 
 
         cv2.imshow(f"test", frame_bgr)
 
         if cv2.waitKey(1) == ord('q'):
-            break  
+            break

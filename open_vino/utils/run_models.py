@@ -90,7 +90,7 @@ class Models:
             self.input_shapes.append(shape)
 
 
-    def predict(self, image: np.ndarray, model_index: int = 0) -> Union[torch.Tensor, None]:
+    def predict(self, image: np.ndarray, model_index: int = 0) -> Union[np.ndarray, None]:
         """
         Run inference on a single BGR image using the specified model.
 
@@ -119,12 +119,12 @@ class Models:
             conf_thres=self.conf_thres,
             iou_thres=self.iou_thres,
             agnostic=False,
-        )[0]
+        )[0].numpy()
         # print(detections)
 
         if detections.shape[0] != 0:
             # for i in range(len(detections)):
-                detections[:4] = torch.from_numpy(inverse_letterbox(detections[:4], (img_h,img_w), w))
+                detections[:4] = inverse_letterbox(detections[:4], (img_h,img_w), w)
         else:
             return None
 

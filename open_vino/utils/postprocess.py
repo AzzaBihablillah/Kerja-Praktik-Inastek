@@ -2,6 +2,20 @@ import numpy as np
 from typing import Tuple, Union
 import torch
 
+def xy_center(xyxy: Union[np.ndarray, torch.Tensor]):
+    if isinstance(xyxy, torch.Tensor):
+        xyxy = xyxy.numpy()
+    
+    assert (
+        xyxy.shape[1] == 4
+    ), f"Invalid xyxy input: xyxy.shape[0] = {xyxy.shape[0]}"
+    
+    
+    x_center = (xyxy[0]+xyxy[2])/2
+    y_center = (xyxy[1]+xyxy[3])/2
+
+    return np.array([x_center, y_center]).astype(np.int32)
+
 def inverse_letterbox(
     coords: Union[np.ndarray, torch.Tensor],
     original_shape: Tuple[int, int],
