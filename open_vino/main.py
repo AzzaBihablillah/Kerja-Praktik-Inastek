@@ -3,6 +3,7 @@ print("Importing dependecies...")
 from utils.inference_classification import Classify
 from utils.inference_object_detection import Detect
 from utils.preprocess import preserve_aspect_ratio_resize, pad_to_square
+from utils.postprocess import xy_center
 import os
 from utils.serial_port import Micro
 import cv2
@@ -110,9 +111,12 @@ if __name__ == "__main__":
     # model_index = 0
     # micro = Micro()
 
-    capture = VideoCapture(1)
+    capture = VideoCapture(2)
     frame_height = capture.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
     frame_width = capture.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+    # capture.cap.get(cv2.CAP_PROP_name)
+
+    x_center_boundary = np.array([frame_width * 0.35, frame_width - frame_width * 0.35]).astype(np.int32)
 
     # print(frame_height, frame_width)
 
@@ -123,6 +127,8 @@ if __name__ == "__main__":
         if result is not None:
             # print(result.shape)
             for i in range(result.shape[0]):
+                if not x_center_boundary[0] < xy_center(result[i,:4])[0] <x_center_boundary[1]:
+                    continue
                 annotated_frame = cv2.rectangle(
                                                 frame_bgr, 
                                                 (int(result[i,0]), int(result[i,1])), 

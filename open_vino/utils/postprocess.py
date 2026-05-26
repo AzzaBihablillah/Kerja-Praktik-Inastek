@@ -7,7 +7,7 @@ def xy_center(xyxy: Union[np.ndarray, torch.Tensor]):
         xyxy = xyxy.numpy()
     
     assert (
-        xyxy.shape[1] == 4
+        xyxy.shape[0] == 4
     ), f"Invalid xyxy input: xyxy.shape[0] = {xyxy.shape[0]}"
     
     
