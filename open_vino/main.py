@@ -129,11 +129,15 @@ if __name__ == "__main__":
             for i in range(result.shape[0]):
                 if not x_center_boundary[0] < xy_center(result[i,:4])[0] <x_center_boundary[1]:
                     continue
+                if int(result[i,5]) == 0:
+                    bgr_value = (0,255,0)
+                else:
+                    bgr_value = (0,0,255)
                 annotated_frame = cv2.rectangle(
                                                 frame_bgr, 
                                                 (int(result[i,0]), int(result[i,1])), 
                                                 (int(result[i,2]), int(result[i,3])), 
-                                                (0,0,255), 
+                                                bgr_value, 
                                                 2
             )
                 annotated_frame = cv2.putText(
@@ -143,7 +147,7 @@ if __name__ == "__main__":
                                             (int(result[i,0]), int(result[i,1]) - 10), 
                                             cv2.FONT_HERSHEY_SIMPLEX, 
                                             0.6, 
-                                            (0, 0, 255), 
+                                            bgr_value, 
                                             2
                                     )
                 
