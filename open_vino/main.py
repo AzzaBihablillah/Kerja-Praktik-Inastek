@@ -37,8 +37,7 @@ models = Models(
     class_names=[
         ["bottle", "not_bottle"],
     ],
-    types=MODEL_DETECTION_TYPE,
-    
+    types=MODEL_DETECTION_TYPE
 
 )
 
@@ -119,6 +118,16 @@ if __name__ == "__main__":
                                                 (0,0,255), 
                                                 2
             )
+                annotated_frame = cv2.putText(
+                                            annotated_frame, 
+                                            # f'{models.class_names[i][int(result[i][5])]}: {int(result[i][4]*100)} %', 
+                                            f'{models.class_names[0][int(result[i,5])]}: {result[i,4]}',
+                                            (int(result[i,0]), int(result[i,1]) - 10), 
+                                            cv2.FONT_HERSHEY_SIMPLEX, 
+                                            0.6, 
+                                            (0, 0, 255), 
+                                            2
+                                    )
 
 
 
