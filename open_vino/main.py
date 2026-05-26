@@ -95,6 +95,14 @@ class VideoCapture:
         """Signal the reader thread to stop cleanly."""
         self._stop.set()
         self._thread.join(timeout=3.0)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self._stop.set()
+        self._thread.join(timeout=3.0)
+        return False
     
 
 if __name__ == "__main__":
