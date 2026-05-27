@@ -1,4 +1,4 @@
-from openvino.runtime import Core
+from openvino import Core
 from .detector_utils import non_max_suppression, save_output
 from .preprocess import preprocess_image_yolov8_format
 import torch

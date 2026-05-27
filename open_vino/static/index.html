@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RVM - Reverse Vending Machine</title>
+
+  <!-- Tailwind CSS (CDN, tanpa build step) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Alpine.js (CDN, reaktivitas ringan) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <style>
+    html { font-size: 18px; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .bottle-item { animation: slideIn 0.25s ease-out; }
+
+    @keyframes flashGreen {
+      0%, 100% { background-color: transparent; }
+      30%      { background-color: rgba(34,197,94,0.15); }
+    }
+    .flash-valid { animation: flashGreen 0.7s ease-out; }
+
+    @keyframes flashRed {
+      0%, 100% { background-color: transparent; }
+      30%      { background-color: rgba(239,68,68,0.15); }
+    }
+    .flash-invalid { animation: flashRed 0.7s ease-out; }
+
+    #cam-idle, #cam-active { image-rendering: auto; }
+  </style>
+</head>
+
+<body class="bg-gray-950 text-white min-h-screen select-none overflow-hidden"
+      x-data="rvm()"
+      x-init="init()">
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- SCREEN: IDLE                                                           -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div x-show="screen === 'idle'"
+       x-transition:enter="transition ease-out duration-300"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       class="flex flex-col lg:flex-row items-center justify-center min-h-screen gap-10 px-8 py-8">
+
+    <!-- Kiri: kamera preview -->
+    <div class="flex flex-col items-center gap-3 w-full lg:w-1/2">
+      <img id="cam-idle"
+           src="/video_feed"
+           class="rounded-2xl w-full border border-gray-700 bg-gray-900"
+           style="max-height: 50vh; object-fit: contain;"
+           alt="Camera preview"
+           onerror="this.src=''; this.alt='Kamera tidak tersedia';" />
+      <p class="text-gray-500 text-sm text-center">
+        Zona aktif: <span class="text-gray-300">area tengah (35% - 65% lebar frame)</span><br/>
+        Pastikan botol melintas di antara dua garis abu-abu
+      </p>
+    </div>
+
+    <!-- Kanan: info + tombol -->
+    <div class="flex flex-col items-center gap-8 w-full lg:w-1/2">
+      <div class="text-center">
+        <h1 class="text-4xl font-bold tracking-wide text-green-400">Reverse Vending Machine</h1>
+        <p class="text-gray-400 mt-3 text-lg">Tukar botol plastik PET dengan poin reward</p>
+      </div>
+
+      <!-- Status koneksi -->
+      <div class="flex items-center gap-2 text-sm"
+           :class="connected ? 'text-green-400' : 'text-red-400'">
+        <div class="w-2.5 h-2.5 rounded-full"
+             :class="connected ? 'bg-green-400 animate-pulse' : 'bg-red-500'"></div>
+        <span x-text="connected ? 'Sistem siap' : 'Menghubungkan...'"></span>
+      </div>
+
+      <!-- Tombol mulai -->
+      <button @click="startSession()"
+              :disabled="!connected || starting"
+              class="bg-green-500 hover:bg-green-400 active:bg-green-600
+                     disabled:bg-gray-700 disabled:cursor-not-allowed
+                     text-white text-2xl font-bold py-6 px-20 rounded-2xl
+                     shadow-lg shadow-green-900/50 transition-all duration-150
+                     focus:outline-none focus:ring-4 focus:ring-green-400/40 w-full max-w-xs">
+        <span x-show="!starting">MULAI SESI</span>
+        <span x-show="starting" class="flex items-center justify-center gap-3">
+          <svg class="animate-spin h-6 w-6" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>
+          Memulai...
+        </span>
+      </button>
+
+      <p class="text-gray-500 text-sm text-center max-w-xs leading-relaxed">
+        Tekan <strong class="text-gray-300">MULAI SESI</strong>, lalu masukkan botol satu per satu.<br/>
+        Tekan <strong class="text-gray-300">SELESAI</strong> jika sudah selesai.
+      </p>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- SCREEN: ACTIVE SESSION                                                 -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div x-show="screen === 'active'"
+       x-transition:enter="transition ease-out duration-300"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       class="flex flex-col h-screen">
+
+    <!-- Header bar -->
+    <div class="flex items-center justify-between bg-gray-900 border-b border-gray-800 px-6 py-3 shrink-0">
+      <span class="text-green-400 font-semibold text-lg flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse inline-block"></span>
+        Sesi Berjalan
+      </span>
+      <button @click="endSession()"
+              :disabled="ending"
+              class="bg-red-600 hover:bg-red-500 active:bg-red-700
+                     disabled:bg-gray-700 disabled:cursor-not-allowed
+                     text-white font-bold py-2 px-8 rounded-xl
+                     transition-all duration-150 text-lg
+                     focus:outline-none focus:ring-4 focus:ring-red-400/40">
+        <span x-show="!ending">SELESAI</span>
+        <span x-show="ending">Menyimpan...</span>
+      </button>
+    </div>
+
+    <!-- Body: 2 kolom -->
+    <div class="flex flex-1 overflow-hidden gap-0">
+
+      <!-- Kolom kiri: kamera -->
+      <div class="flex flex-col items-center justify-start gap-3 p-4 w-1/2 border-r border-gray-800 bg-gray-950">
+        <img id="cam-active"
+             src="/video_feed"
+             class="rounded-xl w-full border border-gray-800 bg-gray-900"
+             style="max-height: calc(100vh - 140px); object-fit: contain;"
+             alt="Camera feed"
+             onerror="this.src=''; this.alt='Kamera tidak tersedia';" />
+        <p class="text-gray-600 text-xs text-center">
+          Zona aktif: area tengah (35% - 65%) &nbsp;|&nbsp;
+          <span class="text-green-600">&#9632;</span> Valid &nbsp;
+          <span class="text-red-600">&#9632;</span> Invalid
+        </p>
+      </div>
+
+      <!-- Kolom kanan: scoreboard + daftar botol -->
+      <div class="flex flex-col w-1/2 overflow-hidden">
+
+        <!-- Scoreboard -->
+        <div class="grid grid-cols-3 gap-3 p-4 bg-gray-900/60 border-b border-gray-800 shrink-0">
+          <div class="bg-green-950/60 border border-green-800/40 rounded-xl p-3 text-center">
+            <div class="text-green-400 text-xs uppercase tracking-widest mb-1">Diterima</div>
+            <div class="text-4xl font-bold text-green-300" x-text="totalValid">0</div>
+          </div>
+          <div class="bg-yellow-950/60 border border-yellow-800/40 rounded-xl p-3 text-center">
+            <div class="text-yellow-400 text-xs uppercase tracking-widest mb-1">Poin</div>
+            <div class="text-4xl font-bold text-yellow-300" x-text="totalPoints">0</div>
+          </div>
+          <div class="bg-red-950/60 border border-red-800/40 rounded-xl p-3 text-center">
+            <div class="text-red-400 text-xs uppercase tracking-widest mb-1">Ditolak</div>
+            <div class="text-4xl font-bold text-red-300" x-text="totalInvalid">0</div>
+          </div>
+        </div>
+
+        <!-- Daftar botol (scroll) -->
+        <div class="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+
+          <template x-if="recentBottles.length === 0">
+            <div class="text-center text-gray-600 py-12 text-lg">
+              Masukkan botol ke dalam zona deteksi...
+            </div>
+          </template>
+
+          <template x-for="b in recentBottles" :key="b.track_id">
+            <div class="bottle-item flex items-center justify-between
+                        rounded-xl px-4 py-3 border"
+                 :class="b.decision === 'valid'
+                           ? 'bg-green-950/40 border-green-800/40 flash-valid'
+                           : 'bg-red-950/40 border-red-800/40 flash-invalid'">
+              <div class="flex items-center gap-3">
+                <!-- Indikator warna (lingkaran kecil) -->
+                <span class="w-3 h-3 rounded-full shrink-0"
+                      :class="b.decision === 'valid' ? 'bg-green-400' : 'bg-red-500'"></span>
+                <div>
+                  <!-- Status valid/invalid -->
+                  <div class="font-semibold"
+                       :class="b.decision === 'valid' ? 'text-green-300' : 'text-red-300'"
+                       x-text="b.decision === 'valid' ? 'Diterima' : 'Ditolak'">
+                  </div>
+                  <!-- Nama identitas botol (SKU / brand / "Botol #N") -->
+                  <div class="text-gray-300 text-sm font-medium"
+                       x-text="b.display_name">
+                  </div>
+                  <!-- Alasan invalid (jika ada) -->
+                  <div class="text-gray-500 text-xs"
+                       x-text="b.decision === 'invalid' ? b.reason_label : ''">
+                  </div>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="font-bold"
+                     :class="b.decision === 'valid' ? 'text-yellow-300' : 'text-gray-600'"
+                     x-text="b.decision === 'valid' ? '+' + b.points + ' poin' : '0 poin'">
+                </div>
+                <div class="text-gray-600 text-xs"
+                     x-text="(b.confidence * 100).toFixed(0) + '%'">
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- SCREEN: SUMMARY                                                        -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div x-show="screen === 'summary'"
+       x-transition:enter="transition ease-out duration-400"
+       x-transition:enter-start="opacity-0 translate-y-4"
+       x-transition:enter-end="opacity-100 translate-y-0"
+       class="flex flex-col items-center min-h-screen px-6 py-10 gap-8">
+
+    <div class="text-center">
+      <h2 class="text-3xl font-bold">Sesi Selesai</h2>
+      <p class="text-gray-500 mt-2">Terima kasih sudah menggunakan RVM</p>
+    </div>
+
+    <!-- Ringkasan utama -->
+    <div class="w-full max-w-md grid grid-cols-3 gap-3">
+      <div class="bg-green-950/60 border border-green-800/40 rounded-2xl p-4 text-center">
+        <div class="text-green-400 text-xs uppercase tracking-widest mb-1">Diterima</div>
+        <div class="text-4xl font-bold text-green-300" x-text="summary.total_valid ?? 0"></div>
+      </div>
+      <div class="bg-yellow-950/60 border border-yellow-800/40 rounded-2xl p-4 text-center">
+        <div class="text-yellow-400 text-xs uppercase tracking-widest mb-1">Total Poin</div>
+        <div class="text-4xl font-bold text-yellow-300" x-text="summary.total_points ?? 0"></div>
+      </div>
+      <div class="bg-red-950/60 border border-red-800/40 rounded-2xl p-4 text-center">
+        <div class="text-red-400 text-xs uppercase tracking-widest mb-1">Ditolak</div>
+        <div class="text-4xl font-bold text-red-300" x-text="summary.total_invalid ?? 0"></div>
+      </div>
+    </div>
+
+    <!-- Detail botol -->
+    <div class="w-full max-w-md overflow-y-auto space-y-2" style="max-height: 40vh;">
+      <template x-for="b in (summary.bottles ?? [])" :key="b.track_id">
+        <div class="flex items-center justify-between rounded-xl px-4 py-3 text-sm border"
+             :class="b.decision === 'valid'
+                       ? 'bg-green-950/30 border-green-900/50'
+                       : 'bg-red-950/30 border-red-900/50'">
+          <div class="flex items-center gap-3">
+            <span class="w-2.5 h-2.5 rounded-full shrink-0"
+                  :class="b.decision === 'valid' ? 'bg-green-400' : 'bg-red-500'"></span>
+            <div>
+              <!-- Status -->
+              <div :class="b.decision === 'valid' ? 'text-green-300' : 'text-red-300'"
+                   x-text="b.decision === 'valid' ? 'Diterima' : 'Ditolak'"></div>
+              <!-- Nama identitas botol -->
+              <div class="text-gray-300 text-xs font-medium" x-text="b.display_name"></div>
+              <!-- Alasan invalid -->
+              <template x-if="b.decision === 'invalid'">
+                <div class="text-gray-500 text-xs" x-text="b.reason_label"></div>
+              </template>
+            </div>
+          </div>
+          <span :class="b.decision === 'valid' ? 'text-yellow-300 font-semibold' : 'text-gray-600'"
+                x-text="b.decision === 'valid' ? '+' + b.points + ' poin' : '0 poin'"></span>
+        </div>
+      </template>
+    </div>
+
+    <!-- Tombol aksi -->
+    <div class="w-full max-w-md">
+      <button @click="newSession()"
+              class="w-full bg-green-600 hover:bg-green-500 active:bg-green-700
+                     text-white font-bold py-4 rounded-2xl text-xl
+                     transition-all duration-150
+                     focus:outline-none focus:ring-4 focus:ring-green-400/40">
+        Sesi Baru
+      </button>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- Alpine.js logic                                                        -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <script>
+    function rvm() {
+      return {
+        screen:             'idle',
+        connected:          false,
+        starting:           false,
+        ending:             false,
+        totalValid:         0,
+        totalInvalid:       0,
+        totalPoints:        0,
+        recentBottles:      [],
+        lastBottleDecision: null,
+        summary:            {},
+        ws:                 null,
+
+        init() {
+          this.connectWS();
+        },
+
+        connectWS() {
+          const url = `ws://${location.host}/ws`;
+          this.ws   = new WebSocket(url);
+
+          this.ws.onopen  = () => { this.connected = true; };
+          this.ws.onclose = () => {
+            this.connected = false;
+            setTimeout(() => this.connectWS(), 3000);
+          };
+          this.ws.onerror = () => { this.connected = false; };
+          this.ws.onmessage = (evt) => {
+            this.handleEvent(JSON.parse(evt.data));
+          };
+        },
+
+        handleEvent(msg) {
+          switch (msg.type) {
+            case 'init':
+              if (msg.state.is_active) {
+                this.applyState(msg.state);
+                this.screen = 'active';
+              }
+              break;
+
+            case 'session_start':
+              this.totalValid = 0; this.totalInvalid = 0;
+              this.totalPoints = 0; this.recentBottles = [];
+              this.screen = 'active'; this.starting = false;
+              break;
+
+            case 'bottle_done':
+              this.lastBottleDecision = msg.bottle.decision;
+              break;
+
+            case 'session_update':
+              this.totalValid   = msg.total_valid;
+              this.totalInvalid = msg.total_invalid;
+              this.totalPoints  = msg.total_points;
+              if (msg.recent_bottles !== undefined) {
+                this.recentBottles = msg.recent_bottles;
+              }
+              break;
+
+            case 'session_end':
+              this.summary = msg.summary;
+              this.screen  = 'summary';
+              this.ending  = false;
+              break;
+          }
+        },
+
+        applyState(state) {
+          this.totalValid    = state.total_valid;
+          this.totalInvalid  = state.total_invalid;
+          this.totalPoints   = state.total_points;
+          this.recentBottles = state.recent_bottles ?? [];
+        },
+
+        async startSession() {
+          this.starting = true;
+          try {
+            const r = await fetch('/session/start', { method: 'POST' });
+            if (!r.ok) { alert((await r.json()).message); this.starting = false; }
+          } catch { alert('Tidak bisa terhubung ke server.'); this.starting = false; }
+        },
+
+        async endSession() {
+          this.ending = true;
+          try {
+            const r = await fetch('/session/end', { method: 'POST' });
+            if (!r.ok) { alert((await r.json()).message); this.ending = false; }
+          } catch { alert('Tidak bisa terhubung ke server.'); this.ending = false; }
+        },
+
+        newSession() {
+          this.summary = {};
+          this.screen  = 'idle';
+        },
+      };
+    }
+  </script>
+
+</body>
+</html>

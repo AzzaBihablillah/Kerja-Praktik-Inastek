@@ -1,0 +1,13 @@
+openvino==2026.1.0
+opencv-python==4.13.0.92
+torch==2.12.0
+torchvision==0.27.0
+numpy==2.4.6
+pyserial==3.5
+
+# Web interface
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+
+# Hanya dibutuhkan untuk ekspor model (.pt -> OpenVINO)
+# ultralytics==8.4.54

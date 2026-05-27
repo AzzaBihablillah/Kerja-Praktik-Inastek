@@ -1,6 +1,5 @@
 from typing import List
-from openvino.runtime import Core
-import openvino
+from openvino import Core
 from .detector_utils import non_max_suppression, save_output
 from .preprocess import preprocess_image_yolov8_format, letterbox, pad_to_square, preserve_aspect_ratio_resize
 from .postprocess import inverse_letterbox
@@ -8,7 +7,7 @@ import torch
 import numpy as np
 
 from typing import List, Union
-from openvino.runtime import Core
+from openvino import Core
 import torch
 import numpy as np
 
