@@ -218,10 +218,10 @@ async def lifespan(app: FastAPI):
 
     # Cetak URL yang benar — Uvicorn log menampilkan 0.0.0.0 (bind address),
     # tapi yang dipakai di browser adalah localhost
-    print("\n" + "─" * 50)
-    print("  ✅  RVM Interface siap")
-    print("  🌐  Buka browser: http://localhost:8000")
-    print("─" * 50 + "\n")
+    print("\n" + "-" * 50)
+    print("  RVM Interface siap")
+    print("  Buka browser: http://localhost:8000")
+    print("-" * 50 + "\n")
 
     yield   # ← server berjalan
 

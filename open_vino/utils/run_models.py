@@ -122,8 +122,7 @@ class Models:
         # print(detections)
 
         if detections.shape[0] != 0:
-            # for i in range(len(detections)):
-                detections[:4] = inverse_letterbox(detections[:4], (img_h,img_w), w)
+            detections[:, :4] = inverse_letterbox(detections[:, :4], (img_h, img_w), w)
         else:
             return None
 
