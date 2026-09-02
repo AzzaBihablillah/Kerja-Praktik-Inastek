@@ -1,4 +1,4 @@
-"""Append real conveyor cap/no_cap data to synth_cap_v2, colour-balanced.
+"""Append real conveyor cap/no_cap data to synth_cap_v3, colour-balanced.
 
 cap    : sampled ~PER_COLOR per cap-colour bucket (from _by_cap_color manifest), tight labels
 no_cap : all conveyor no_cap (mp + rg)
@@ -10,7 +10,7 @@ import cv2
 
 BASE = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/bottle_cap_base"
 CONV = f"{BASE}/conveyor"
-OUT = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/synth_cap_v2"
+OUT = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/synth_cap_v3"
 PER_COLOR = 130
 SPLIT = (0.80, 0.10, 0.10)
 SEED = 0
@@ -92,7 +92,7 @@ open(f"{OUT}/data.yaml", "w").write(
     "names:\n  0: cap\n  1: no_cap\n")
 
 # ---- final composition ----
-print("\n=== synth_cap_v2 FINAL ===")
+print("\n=== synth_cap_v3 FINAL ===")
 grand = collections.Counter()
 for split in ("train", "val", "test"):
     n_img = len(glob.glob(f"{OUT}/images/{split}/*.jpg"))

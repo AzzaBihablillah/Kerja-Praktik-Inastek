@@ -1,19 +1,22 @@
-"""Live A/B: v1 (left) vs v2 (right) cap/no_cap on webcam.
+"""Live A/B: model A (left) vs model B (right) cap/no_cap on webcam.
 Same frame to both models, boxes drawn per side, confidence shown big.
-q / Esc / close-window to quit.  optional arg: camera index (default 0).
+q / Esc / close-window to quit.
+args: [camera_index] [runA] [runB]   default: 0 synth_cap_v1_640 synth_cap_v3_640
 """
 import sys, time
 import cv2
 from ultralytics import YOLO
 
 DAT = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/cap_runs"
-V1 = f"{DAT}/synth_cap_v1_640/weights/best.pt"
-V2 = f"{DAT}/synth_cap_v2_640/weights/best.pt"
+RUN_A = sys.argv[2] if len(sys.argv) > 2 else "synth_cap_v1_640"
+RUN_B = sys.argv[3] if len(sys.argv) > 3 else "synth_cap_v3_640"
+V1 = f"{DAT}/{RUN_A}/weights/best.pt"
+V2 = f"{DAT}/{RUN_B}/weights/best.pt"
 CAM = int(sys.argv[1]) if len(sys.argv) > 1 else 0
 CONF = 0.15
 NAME = {0: "cap", 1: "no_cap"}
 COL = {0: (0, 200, 0), 1: (0, 0, 255)}
-WIN = "v1  vs  v2      [q = quit]"
+WIN = "A: v1   |   B: v3      [q = quit]"
 
 m1, m2 = YOLO(V1), YOLO(V2)
 cap = cv2.VideoCapture(CAM, cv2.CAP_DSHOW)
@@ -52,8 +55,8 @@ while True:
             break
         continue
     miss = 0
-    left = annotate(frame, m1, "v1")
-    right = annotate(frame, m2, "v2")
+    left = annotate(frame, m1, RUN_A)
+    right = annotate(frame, m2, RUN_B)
     combo = cv2.hconcat([left, right])
     cv2.line(combo, (left.shape[1], 0), (left.shape[1], combo.shape[0]), (255, 255, 0), 2)
     cv2.imshow(WIN, combo)

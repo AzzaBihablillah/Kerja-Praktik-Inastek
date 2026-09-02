@@ -316,12 +316,79 @@ Confusion matrix val: cap↔no_cap tertukar hanya 1–2 %; error utama = backgro
   *cue* kelas — persis yang tidak diinginkan.
 - Class skew ke no_cap tidak menolong karena kalah dominan oleh sinyal degradasi asimetris.
 
-**Keputusan: model produksi = v1 (`synth_cap_v1_640/weights/best.pt`).**
-v2 disimpan hanya untuk pembanding.
+**Keputusan: model produksi tetap v1.** v2 disimpan hanya untuk pembanding.
 
 ---
 
-## 9. Artefak & lokasi file
+## 9. Iterasi v3 — `synth_cap_v3_640` (perbaikan kesalahan v2)
+
+### 9.1 Perubahan
+
+Memperbaiki akar masalah v2 (§8.4):
+
+| aspek | v2 (gagal) | v3 |
+|---|---|---|
+| `hard_degrade` diterapkan ke | **hanya `no_cap`**, p 0,55 | **`cap` & `no_cap` sama rata**, p 0,40 — kualitas gambar tidak lagi jadi *cue* kelas |
+| intensitas down-res | 120–300 px | 150–360 px (lebih lembut) |
+| oversample `no_cap` | ×48 vs cap ×26 (agresif) | ×44 vs cap ×30 (~1,5×, moderat) |
+| JPEG save quality | no_cap 22–70 / cap 38–95 (terpisah) | 30–92 (sama untuk keduanya) |
+| epoch | 100, patience 30 | **70, patience 20** (bukti plateau v1/v2 mendukung) |
+
+### 9.2 Komposisi dataset v3
+
+| split | gambar | box cap | box no_cap |
+|---|---|---|---|
+| train | 5.186 | 2.729 | 3.145 |
+| **TOTAL** | **6.491** | **3.389** | **3.965** (skew ~54 %) |
+
+Durasi training: **1,33 jam** / 70 epoch.
+
+### 9.3 Hasil
+
+| | P | R | mAP@50 | mAP@50-95 |
+|---|---|---|---|---|
+| **val** (best.pt, 565 img) | 0,971 | 0,954 | 0,979 | 0,750 |
+| — cap | 0,971 | 0,951 | 0,980 | 0,759 |
+| — no_cap | 0,972 | 0,958 | 0,979 | 0,741 |
+| **test** (740 img) | 0,941 | 0,948 | 0,967 | 0,711 |
+| — cap | 0,940 | 0,949 | 0,965 | 0,684 |
+| — no_cap | 0,942 | 0,948 | 0,968 | 0,738 |
+
+Metrik "bersih" v3 sedikit lebih rendah dari v1 — **wajar**: test set v3 mengandung ~40 %
+gambar terdegradasi (kedua kelas), jadi bukan perbandingan apple-to-apple dengan test set v1.
+Positifnya: performa `cap` dan `no_cap` kini **seimbang** (tidak ada asimetri seperti v2).
+
+### 9.4 A/B v1 vs v3
+
+- **Offline**, 12 foto `no_cap` conveyor asli + 60 `cap`, versi bersih & didegradasi buatan
+  (down-res 220 px, JPEG q32):
+
+  | kondisi degraded | v1 | v3 |
+  |---|---|---|
+  | `no_cap` mean confidence | 0,777 | **0,828** ↑ |
+  | `cap` benar (dari 60) | 53 | **57** ↑ |
+
+  → v3 mempertahankan confidence lebih baik saat gambar buram, untuk **kedua** kelas
+  (degradasi simetris bekerja; sampel `no_cap` kecil).
+
+- **Live webcam A/B (v1 kiri, v3 kanan):** **v1 tetap lebih robust.** v3 tidak lebih baik
+  di feed webcam nyata.
+
+### 9.5 Kesimpulan v3: tidak mengalahkan v1
+
+Penyebab v3 kalah di live meski metrik degraded-offline naik:
+- A/B offline memakai degradasi **buatan** (down-res + blur + JPEG). Artefak webcam nyata
+  berbeda (noise sensor, autofocus, motion blur) — v3 belajar tahan ke degradasi buatan,
+  bukan ke degradasi webcam.
+- YOLOv8n hanya 3 juta parameter. Menambah ~40 % gambar terdegradasi memakai kapasitas
+  model untuk fitur *degraded* → fitur kondisi bersih melemah. Feed webcam nyata lebih
+  dekat ke "bersih" daripada ke `hard_degrade` yang brutal → v1 menang.
+
+**Keputusan: model produksi tetap v1 (`synth_cap_v1_640/weights/best.pt`).**
+
+---
+
+## 10. Artefak & lokasi file
 
 Semua di bawah `datasets/`:
 
@@ -335,9 +402,11 @@ Semua di bawah `datasets/`:
 | `cap_shoot_v1_cutout/held/` | 182 cutout mentah (ada tangan) |
 | `synth_cap_v1/` | dataset sintetis v1 — 5.731 gambar + data.yaml |
 | `synth_cap_v2/` | dataset sintetis v2 — 6.511 gambar + data.yaml |
+| `synth_cap_v3/` | dataset sintetis v3 — 6.491 gambar + data.yaml |
 | `cap_runs/synth_cap_v1_640/` | **run produksi** — weights/best.pt, weights/best_openvino_model/, results.png, confusion_matrix*, PR/F1 curves |
 | `cap_runs/synth_cap_v1_640_test/` | metrik & plot di test split |
 | `cap_runs/synth_cap_v2_640/` | run v2 (pembanding, tidak dipakai) |
+| `cap_runs/synth_cap_v3_640/` | run v3 (pembanding, tidak dipakai) |
 
 ### Script
 
@@ -354,35 +423,42 @@ Semua di bawah `datasets/`:
 | `add_nocap.py` | fix-up: fold-in 109 conveyor no_cap |
 | `train_synth.py` | training YOLOv8n + eval test + ekspor OpenVINO |
 | `live_cap_test.py` | uji live webcam 1 model |
-| `live_ab_test.py` | uji live webcam A/B (v1 vs v2 split-screen) |
+| `live_ab_test.py` | uji live webcam A/B 2 model split-screen (default v1 vs v3; run bisa dipilih via argumen) |
 | `keep_awake.py` | cegah laptop sleep selama job panjang (ctypes, non-permanen) |
 
 ---
 
-## 10. Kesimpulan
+## 11. Kesimpulan
 
 1. **Pipeline cut-and-paste + background generate berhasil**: dari 149 cutout botol milik
-   sendiri + 943 gambar conveyor asli, model YOLOv8n mencapai mAP@50 **0,981** dan
-   recall **0,947** di test split (v1).
+   sendiri + 943 gambar conveyor asli, model YOLOv8n (v1) mencapai mAP@50 **0,981** dan
+   recall **0,947** di test split.
 2. Model **kuat di POV top-down** (target deployment), **lemah di POV lain** (mis. webcam
    sejajar mata) — sesuai ekspektasi karena distribusi training.
-3. **Iterasi v2 gagal** karena kesalahan desain augmentasi (degradasi asimetris membuat
-   kualitas gambar jadi *cue* kelas). Pelajaran: augmentasi degradasi harus **rata ke
-   semua kelas**.
-4. Angka evaluasi masih dari data sintetis + proxy conveyor. **Belum ada evaluasi di belt
-   hijau + kamera mesin sebenarnya.**
+3. **Dua iterasi perbaikan sintetis (v2, v3) tidak mengalahkan v1 di uji live:**
+   - v2 gagal karena kesalahan desain — degradasi hanya di `no_cap` membuat kualitas gambar
+     jadi *cue* kelas ("tajam → cap").
+   - v3 memperbaiki desain (degradasi simetris) dan menang tipis di A/B **offline**, tetapi
+     kalah di webcam nyata: degradasi buatan ≠ artefak webcam, dan model nano kehabisan
+     kapasitas saat dipaksa belajar kondisi terdegradasi.
+   - **Pelajaran:** knob-tuning augmentasi sintetis sudah mencapai batasnya untuk kasus ini.
+     Peningkatan selanjutnya harus datang dari **data domain nyata**, bukan sintetis.
+4. Semua angka evaluasi masih dari data sintetis + proxy conveyor. **Belum ada evaluasi di
+   belt hijau + kamera mesin sebenarnya** — ini syarat sebelum model dianggap siap produksi.
 
-## 11. Rekomendasi lanjutan
+**Model final: v1 (`cap_runs/synth_cap_v1_640/weights/best.pt` + `best_openvino_model/`).**
+
+## 12. Rekomendasi lanjutan
 
 | prioritas | langkah |
 |---|---|
-| Tinggi | **Ambil data asli**: foto `no_cap` (dan `cap`) di belt hijau + kamera mesin, ≥ 150–300, berbagai merek & kondisi. Ini yang paling berdampak — tweak sintetis sudah mentok. |
-| Tinggi | Labeli sebagian `cap_conveyor_raw/` (3.018 foto, di luar training) sebagai **holdout evaluasi domain asli**. |
-| Sedang | v3 sintetis: degradasi diterapkan **rata cap & no_cap**, oversample no_cap moderat (×1,5), tambah variasi bukan repetisi. |
-| Sedang | Post-rule di decision logic: jika prediksi `cap` tapi margin ke `no_cap` < ~0,2 → status "ragu" → re-scan / reject. |
-| Rendah | Uji `best.pt` OpenVINO di target (Jetson pakai TensorRT — OpenVINO tidak jalan di ARM+NVIDIA). |
+| Tinggi | **Ambil data asli**: foto `no_cap` (dan `cap`) di belt hijau + kamera mesin, ≥ 150–300, berbagai merek & kondisi, lalu retrain. Ini satu-satunya jalur peningkatan yang tersisa — tweak sintetis sudah terbukti mentok (v2, v3). |
+| Tinggi | Labeli sebagian `cap_conveyor_raw/` (3.018 foto, di luar training) sebagai **holdout evaluasi domain asli** untuk mengukur v1 secara jujur. |
+| Sedang | Post-rule di decision logic: jika prediksi `cap` tapi margin ke `no_cap` < ~0,2 → status "ragu" → re-scan / reject. Murah, tidak perlu retrain. |
+| Rendah | Isu no_cap-under-confident kemungkinan besar hilang di kamera mesin asli (fixed focus, cahaya terkontrol, top-down) — verifikasi dulu di hardware sebelum investasi lebih jauh. |
+| Rendah | Konversi `best.pt` untuk target Jetson pakai **TensorRT** (OpenVINO tidak jalan di ARM+NVIDIA). |
 
-## 12. Catatan reproduksibilitas
+## 13. Catatan reproduksibilitas
 
 Urutan menjalankan ulang pipeline v1 (dari `datasets/`, venv aktif):
 

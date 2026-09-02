@@ -3,7 +3,7 @@ import glob, os, re, random, shutil, collections
 import cv2
 
 CONV = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/bottle_cap_base/conveyor"
-OUT = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/synth_cap_v2"
+OUT = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/synth_cap_v3"
 rng = random.Random(0)
 
 
@@ -57,7 +57,7 @@ for ip, lp, st in picks:
 print("no_cap added:", dict(added))
 
 # recount
-print("\n=== synth_cap_v2 FINAL (with real no_cap) ===")
+print("\n=== synth_cap_v3 FINAL (with real no_cap) ===")
 tot = collections.Counter()
 for split in ("train", "val", "test"):
     n_img = len(glob.glob(f"{OUT}/images/{split}/*.jpg"))

@@ -28,6 +28,10 @@ IMG = {
         ("cap_runs/synth_cap_v2_640/results.png", "v2 — kurva training 100 epoch."),
         ("cap_runs/synth_cap_v2_640/confusion_matrix_normalized.png", "v2 — confusion matrix (val). cap↔no_cap tertukar hanya 1–2%."),
     ],
+    "9": [
+        ("cap_runs/synth_cap_v3_640/results.png", "v3 — kurva training 70 epoch (degradasi simetris cap & no_cap)."),
+        ("cap_runs/synth_cap_v3_640/confusion_matrix_normalized.png", "v3 — confusion matrix (val). Performa cap & no_cap seimbang."),
+    ],
 }
 
 

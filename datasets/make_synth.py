@@ -5,16 +5,16 @@ generated backgrounds (option A: every colour uniform-random, no belt bias) with
 heavy augmentation.  Cap-box label transformed through every geometric step.
 
 Grouped split by cutout stem (all variants of one cutout stay in one split), 80/10/10,
-stratified by class.  Output YOLO -> datasets/synth_cap_v2/{images,labels}/{train,val,test}
+stratified by class.  Output YOLO -> datasets/synth_cap_v3/{images,labels}/{train,val,test}
 Conveyor real data is appended afterwards by add_conveyor.py.
 """
 import glob, os, gc, math, random
 import cv2, numpy as np
 
 D = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/cap_shoot_v1_cutout"
-OUT = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/synth_cap_v2"
+OUT = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/synth_cap_v3"
 FRAME = 640
-VARIANTS = {0: 26, 1: 48}                 # per-class variant count (cap=0, no_cap=1) -- no_cap oversampled
+VARIANTS = {0: 30, 1: 44}                 # per-class variant count (cap=0, no_cap=1) -- moderate no_cap oversample (~1.5x)
 SPLIT = (0.80, 0.10, 0.10)
 SEED = 0
 
@@ -204,10 +204,10 @@ def full_frame_aug(canvas, boxes, g):
 
 
 def hard_degrade(canvas, g):
-    """Aggressive quality loss -- used mostly on no_cap so the model stays confident
-    on the small neck region under bad-camera conditions. Boxes unaffected."""
+    """Quality loss (low-res + blur + noise + jpeg). Applied EQUALLY to cap and no_cap
+    so image sharpness never becomes a class cue (the v2 mistake). Boxes unaffected."""
     h, w = canvas.shape[:2]
-    s = int(g.integers(120, 300))                       # simulate low-res sensor
+    s = int(g.integers(150, 360))                       # simulate low-res sensor
     canvas = cv2.resize(canvas, (s, s), interpolation=cv2.INTER_AREA)
     canvas = cv2.resize(canvas, (w, h), interpolation=cv2.INTER_LINEAR)
     if g.random() < 0.7:
@@ -272,13 +272,13 @@ def main():
             if g.random() < 0.22:
                 canvas = coarse_dropout(canvas, region, g)
             canvas, boxes = full_frame_aug(canvas, boxes, g)
-            if it["cls"] == 1 and g.random() < 0.55:            # no_cap: bad-camera robustness
+            if g.random() < 0.40:                               # bad-camera robustness, BOTH classes
                 canvas = hard_degrade(canvas, g)
             lines = emit(boxes, FRAME, FRAME)
             if not lines:
                 continue
             name = f"syn_{it['stem']}_{v:02d}"
-            q = int(g.uniform(22, 70) if it["cls"] == 1 else g.uniform(38, 95))
+            q = int(g.uniform(30, 92))                          # same jpeg range for both classes
             cv2.imwrite(f"{OUT}/images/{split}/{name}.jpg", canvas, [cv2.IMWRITE_JPEG_QUALITY, q])
             open(f"{OUT}/labels/{split}/{name}.txt", "w").write("\n".join(lines) + "\n")
             cnt[split] += 1
