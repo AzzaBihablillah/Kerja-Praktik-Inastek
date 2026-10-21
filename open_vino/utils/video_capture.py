@@ -8,6 +8,7 @@ mengembalikan frame terbaru — frame lama dibuang otomatis.
 from __future__ import annotations
 
 import logging
+import os
 import queue
 import threading
 
@@ -18,7 +19,12 @@ logger = logging.getLogger(__name__)
 
 class VideoCapture:
     def __init__(self, source: int | str):
-        self.cap = cv2.VideoCapture(source)
+        # Windows: backend MSMF default butuh ~100 detik membuka webcam USB (C922);
+        # DirectShow ~1 detik. Linux/Jetson tetap pakai backend default (V4L2).
+        if os.name == "nt" and isinstance(source, int):
+            self.cap = cv2.VideoCapture(source, cv2.CAP_DSHOW)
+        else:
+            self.cap = cv2.VideoCapture(source)
         if not self.cap.isOpened():
             raise RuntimeError(f"Failed to open video source: {source}")
 

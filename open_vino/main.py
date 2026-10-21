@@ -22,6 +22,12 @@ import logging
 
 ROOT = os.getcwd()
 
+# Nilai lebih kecil membuat keputusan selesai/poin muncul lebih cepat,
+# tetapi bisa meningkatkan risiko double count pada botol yang bergerak cepat.
+TRACKER_IOU_THRESHOLD = 0.3
+TRACKER_MAX_LOST = 8
+TRACKER_MIN_FRAMES_SEEN = 2
+
 logger = logging.getLogger(__name__)
 
 print("Preparing model...")
@@ -54,7 +60,8 @@ if __name__ == "__main__":
     # micro = Micro()
     # micro.open(0)   # sesuaikan port jika perlu
 
-    capture = VideoCapture(0)
+    # Jetson: 2 (default). Laptop Windows ini: set RVM_CAMERA=1.
+    capture = VideoCapture(int(os.environ.get("RVM_CAMERA", "2")))
     frame_height = int(capture.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_width  = int(capture.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 
@@ -65,20 +72,20 @@ if __name__ == "__main__":
     tracker = BottleTracker(
         # Minimum IoU antara posisi prediksi track dan deteksi baru agar dianggap
         # objek yang sama.  Turunkan (mis. 0.2) kalau konveyor cepat / sering miss-match.
-        iou_threshold=0.3,
+        iou_threshold=TRACKER_IOU_THRESHOLD,
 
         # Berapa frame berturut-turut tanpa deteksi sebelum track dianggap "selesai".
-        # @ 30 fps: 20 frame ≈ 0.67 detik.
+        # @ 30 fps: 8 frame ≈ 0.27 detik.
         # Naikkan kalau botol sering dihitung dua kali (gap deteksi terlalu lama).
         # Turunkan kalau track "hantu" terlalu lama bertahan setelah botol sudah pergi.
-        max_lost=20,
+        max_lost=TRACKER_MAX_LOST,
 
         # Track yang total frame terlihatnya < nilai ini tidak dihitung sebagai botol.
         # Berguna menyaring noise / deteksi kilat bukan botol.
-        # @ 30 fps: 5 frame ≈ 0.17 detik.
+        # @ 30 fps: 2 frame ≈ 0.07 detik.
         # Naikkan kalau masih ada false positive; turunkan kalau botol cepat melintas
         # dan tidak sempat terhitung.
-        min_frames_seen=5,
+        min_frames_seen=TRACKER_MIN_FRAMES_SEEN,
     )
     valid_color   = (0, 255, 0)   # hijau  — VALID
     invalid_color = (0, 0, 255)   # merah  — INVALID

@@ -43,6 +43,15 @@ from utils.video_capture import VideoCapture
 
 ROOT = os.getcwd()
 
+# Semakin kecil nilainya, semakin cepat poin masuk ke UI.
+# Trade-off: terlalu kecil bisa membuat deteksi cepat terhitung ganda.
+TRACKER_IOU_THRESHOLD = 0.3
+TRACKER_MAX_LOST = 8
+TRACKER_MIN_FRAMES_SEEN = 2
+
+# Indeks kamera USB (conveyor). Jetson: 2 (default). Laptop Windows ini: set RVM_CAMERA=1.
+CAMERA_INDEX = int(os.environ.get("RVM_CAMERA", "2"))
+
 # ── Konfigurasi model ─────────────────────────────────────────────────────────
 
 models = Models(
@@ -88,14 +97,14 @@ def _inference_loop(loop: asyncio.AbstractEventLoop) -> None:
         loop.call_soon_threadsafe(_event_queue.put_nowait, event)
 
     tracker     = BottleTracker(
-        iou_threshold=0.3,
-        max_lost=20,
-        min_frames_seen=5,
+        iou_threshold=TRACKER_IOU_THRESHOLD,
+        max_lost=TRACKER_MAX_LOST,
+        min_frames_seen=TRACKER_MIN_FRAMES_SEEN,
     )
     frame_count = 0   # untuk throttle session_update
 
     try:
-        cap = VideoCapture(0)
+        cap = VideoCapture(CAMERA_INDEX)
     except RuntimeError as e:
         push_event({"type": "error", "message": str(e)})
         return
@@ -174,6 +183,17 @@ def _inference_loop(loop: asyncio.AbstractEventLoop) -> None:
                 push_event({
                     "type":   "bottle_done",
                     "bottle": bottle.to_dict(),
+                })
+
+                # Kirim state terbaru segera supaya total poin UI tidak menunggu
+                # siklus frame berikutnya.
+                state = session_manager.get_live_state()
+                push_event({
+                    "type":          "session_update",
+                    "total_valid":   state["total_valid"],
+                    "total_invalid": state["total_invalid"],
+                    "total_points":  state["total_points"],
+                    "recent_bottles": state["recent_bottles"],
                 })
 
                 # Kirim command ke hardware (uncomment saat hardware terhubung)
