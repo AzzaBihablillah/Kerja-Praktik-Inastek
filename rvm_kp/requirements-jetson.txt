@@ -1,0 +1,20 @@
+# Jetson Nano Developer Kit B01 4 GB (P3450) — perangkat target KP. Langkah lengkap: rvm_kp/JETSON-NANO.md
+#
+# 1) DARI NVIDIA (image SD card JetPack 4.6.x untuk Jetson Nano Developer Kit; JANGAN dipasang lewat pip):
+#      Ubuntu 18.04 (L4T R32.7), CUDA 10.2, cuDNN 8.2, TensorRT 8.2, Docker + nvidia-container-runtime.
+#    Python bawaan 3.6 TERLALU TUA untuk Ultralytics modern (butuh >= 3.8)  ->  semua kode jalan DI DALAM Docker:
+#      sudo docker pull ultralytics/ultralytics:latest-jetson-jetpack4
+#    Image ini sudah berisi: Python 3.8, torch & torchvision khusus Jetson (CUDA 10.2), Ultralytics, onnx, onnxslim,
+#    OpenCV, numpy 1.x, TensorRT 8.2 (Python). JANGAN pip install / upgrade torch, torchvision, numpy, opencv di dalamnya.
+#
+# 2) TAMBAHAN di dalam container (pip install -r rvm_kp/requirements-jetson.txt):
+psutil                  # cek RAM (cek_perangkat, benchmark)
+fastapi>=0.100,<0.116   # server; rentang ini masih mendukung Python 3.8
+uvicorn>=0.22,<0.34
+python-snap7            # PLC; jika wheel aarch64 tidak tersedia / gagal: lihat JETSON-NANO.md bagian "PLC"
+#
+# 3) TIDAK DIPAKAI di Jetson: openvino (khusus CPU Intel), onnxruntime (cukup TensorRT), opencv-python dari pip.
+#
+# 4) Setelah terpasang, BUAT engine DI Nano (±10-20 menit per model):
+#      python -m rvm_kp.export_models --format engine --half --workspace 1
+#    lalu cek:   python -m rvm_kp.cek_perangkat   dan   python -m rvm_kp.benchmark --backend tensorrt --profil nano

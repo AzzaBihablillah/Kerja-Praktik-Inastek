@@ -1,0 +1,12 @@
+# Laptop Windows/Linux x86_64 dengan GPU NVIDIA (diuji: RTX 4050, CUDA 12.8)
+# Pasang PyTorch CUDA lebih dulu sesuai https://pytorch.org (contoh CUDA 12.8):
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+ultralytics==8.4.54
+opencv-python==4.13.0.92
+numpy>=2.0
+onnxruntime>=1.20          # backend onnx (CPU); onnxruntime-gpu untuk GPU
+openvino==2026.1.0         # backend openvino (cadangan PC Intel tanpa GPU NVIDIA)
+python-snap7               # komunikasi PLC (server)
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+# TensorRT di laptop opsional: pasang TensorRT for Windows/Linux sesuai versi CUDA, lalu ekspor --format engine

@@ -182,3 +182,5 @@ cython_debug/
 # ML datasets / training runs (large, not versioned) - keep the pipeline scripts
 /datasets/*
 !/datasets/*.py
+!/datasets/README.md
+!/datasets/PINDAH-LOG.csv

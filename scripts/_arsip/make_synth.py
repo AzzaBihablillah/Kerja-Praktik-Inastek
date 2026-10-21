@@ -11,10 +11,17 @@ Conveyor real data is appended afterwards by add_conveyor.py.
 import glob, os, gc, math, random
 import cv2, numpy as np
 
-D = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/cap_shoot_v1_cutout"
-OUT = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/synth_cap_v3"
+import os as _os
+_DS = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets"
+D = f"{_DS}/cap_shoot_v1_cutout"
+_so = _os.environ.get("SYNTH_OUT")
+OUT = (f"{_DS}/{_so}" if _so and "/" not in _so else _so) if _so else f"{_DS}/synth_cap_v3"
+ALL_TRAIN = bool(_os.environ.get("SYNTH_ALL_TRAIN"))     # v4: synthetic goes 100% to train
+HARDNEG = _os.environ.get("SYNTH_HARDNEG", "1") != "0"   # v5: paste bottle base/body, no label
 FRAME = 640
-VARIANTS = {0: 30, 1: 44}                 # per-class variant count (cap=0, no_cap=1) -- moderate no_cap oversample (~1.5x)
+_dv = _os.environ.get("SYNTH_VARIANTS", "")              # e.g. "12,16"
+VARIANTS = ({0: int(_dv.split(",")[0]), 1: int(_dv.split(",")[1])} if _dv
+            else {0: 30, 1: 44})          # per-class variant count (cap=0, no_cap=1)
 SPLIT = (0.80, 0.10, 0.10)
 SEED = 0
 
@@ -149,6 +156,63 @@ def paste(canvas, it, g):
     return canvas, (c, it["cls"], (px, py, rw, rh))
 
 
+def paste_negative(canvas, it, g):
+    """Paste a fragment of bottle BASE / mid-body (never the neck) with NO label.
+    Teaches the net that a ribbed circular plastic form that isn't a cap-region
+    is background -- fixes 'bottle bottom read as no_cap'."""
+    obj = cv2.imread(it["png"], cv2.IMREAD_UNCHANGED)
+    if obj is None or obj.shape[2] != 4:
+        return canvas
+    oh, ow = obj.shape[:2]
+    al = obj[:, :, 3]
+    ys, xs = np.where(al > 16)
+    if len(ys) < 80:
+        return canvas
+    ay0, ay1, ax0, ax1 = ys.min(), ys.max(), xs.min(), xs.max()
+    bx = it["box"] * [ow, oh, ow, oh]                      # cap-region box, px
+    bcx, bcy = (bx[0] + bx[2]) / 2, (bx[1] + bx[3]) / 2
+    if (ay1 - ay0) >= (ax1 - ax0):                         # bottle stands vertical
+        if bcy < (ay0 + ay1) / 2:                          # cap at top -> take bottom
+            cy0, cy1 = int(bx[3] + 0.12 * (ay1 - ay0)), ay1
+        else:
+            cy0, cy1 = ay0, int(bx[1] - 0.12 * (ay1 - ay0))
+        cx0, cx1 = ax0, ax1
+    else:                                                  # bottle lies horizontal
+        if bcx < (ax0 + ax1) / 2:
+            cx0, cx1 = int(bx[2] + 0.12 * (ax1 - ax0)), ax1
+        else:
+            cx0, cx1 = ax0, int(bx[0] - 0.12 * (ax1 - ax0))
+        cy0, cy1 = ay0, ay1
+    cy0, cx0 = max(0, cy0), max(0, cx0)
+    if cx1 - cx0 < 28 or cy1 - cy0 < 28:
+        return canvas
+    crop = obj[cy0:cy1, cx0:cx1].copy()
+    ch0, cw0 = crop.shape[:2]
+    fh, fw = g.uniform(0.5, 1.0), g.uniform(0.5, 1.0)
+    yy = int(g.integers(0, max(1, ch0 - int(ch0 * fh) + 1)))
+    xx = int(g.integers(0, max(1, cw0 - int(cw0 * fw) + 1)))
+    crop = crop[yy:yy + int(ch0 * fh), xx:xx + int(cw0 * fw)]
+    if crop.shape[0] < 16 or crop.shape[1] < 16 or int((crop[:, :, 3] > 16).sum()) < 200:
+        return canvas
+    cb, ca = crop[:, :, :3], crop[:, :, 3]
+    M, (nw, nh) = rotate_keep(cb, float(g.uniform(-180, 180)))
+    cb = cv2.warpAffine(cb, M, (nw, nh), flags=cv2.INTER_LINEAR, borderValue=0)
+    ca = cv2.warpAffine(ca, M, (nw, nh), flags=cv2.INTER_LINEAR, borderValue=0)
+    H, W = canvas.shape[:2]
+    fit = (min(W, H) * g.uniform(0.14, 0.44)) / max(nw, nh)
+    cb = cv2.resize(cb, None, fx=fit, fy=fit)
+    ca = cv2.resize(ca, None, fx=fit, fy=fit)
+    rh, rw = cb.shape[:2]
+    if rw >= W or rh >= H or rw < 8 or rh < 8:
+        return canvas
+    px, py = int(g.integers(0, W - rw + 1)), int(g.integers(0, H - rh + 1))
+    cb = cv2.convertScaleAbs(cb, alpha=g.uniform(0.78, 1.22), beta=g.uniform(-22, 22))
+    a3 = (ca[..., None].astype(np.float32) / 255.0)
+    roi = canvas[py:py + rh, px:px + rw].astype(np.float32)
+    canvas[py:py + rh, px:px + rw] = (cb * a3 + roi * (1 - a3)).astype(np.uint8)
+    return canvas
+
+
 def coarse_dropout(canvas, region, g):
     px, py, rw, rh = region
     for _ in range(int(g.integers(1, 5))):
@@ -255,7 +319,7 @@ def main():
     cnt = {"train": 0, "val": 0, "test": 0}
 
     for idx, it in enumerate(items, 1):
-        split = split_of[it["stem"]]
+        split = "train" if ALL_TRAIN else split_of[it["stem"]]
         for v in range(VARIANTS[it["cls"]]):
             g = np.random.default_rng(hash((it["stem"], v)) & 0xFFFFFFFF)
             canvas = rand_bg(FRAME, FRAME, g)
@@ -271,8 +335,11 @@ def main():
                     boxes.append((r2[0], r2[1]))
             if g.random() < 0.22:
                 canvas = coarse_dropout(canvas, region, g)
+            if HARDNEG and g.random() < 0.33:                   # unlabeled bottle base/body distractor
+                for _ in range(int(g.integers(1, 3))):
+                    canvas = paste_negative(canvas, by_stem[stems[int(g.integers(len(stems)))]], g)
             canvas, boxes = full_frame_aug(canvas, boxes, g)
-            if g.random() < 0.40:                               # bad-camera robustness, BOTH classes
+            if g.random() < 0.25:                               # bad-camera robustness, BOTH classes (mild)
                 canvas = hard_degrade(canvas, g)
             lines = emit(boxes, FRAME, FRAME)
             if not lines:
@@ -285,6 +352,24 @@ def main():
         if idx % 20 == 0:
             print(f"  {idx}/{len(items)} cutouts | {sum(cnt.values())} imgs", flush=True)
             gc.collect()
+
+    if HARDNEG:                                          # pure-background frames: base crops, empty label
+        n_bg = max(40, len(items) // 3)
+        for k in range(n_bg):
+            g = np.random.default_rng(hash(("bg", k)) & 0xFFFFFFFF)
+            canvas = rand_bg(FRAME, FRAME, g)
+            for _ in range(int(g.integers(1, 4))):
+                canvas = paste_negative(canvas, by_stem[stems[int(g.integers(len(stems)))]], g)
+            canvas, _ = full_frame_aug(canvas, [], g)
+            if g.random() < 0.25:
+                canvas = hard_degrade(canvas, g)
+            split = "train" if ALL_TRAIN else "train"    # negatives never in val/test
+            name = f"syn_bg_{k:03d}"
+            q = int(g.uniform(30, 92))
+            cv2.imwrite(f"{OUT}/images/{split}/{name}.jpg", canvas, [cv2.IMWRITE_JPEG_QUALITY, q])
+            open(f"{OUT}/labels/{split}/{name}.txt", "w").write("")
+            cnt[split] += 1
+        print(f"  hardneg background frames: {n_bg}", flush=True)
 
     print(f"SYNTH done: train {cnt['train']} val {cnt['val']} test {cnt['test']} = {sum(cnt.values())}", flush=True)
 

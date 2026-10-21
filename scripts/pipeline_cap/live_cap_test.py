@@ -1,16 +1,16 @@
-"""Live webcam test of the trained cap / no_cap detector (synth_cap_v1_640/best.pt).
+"""Live webcam test of the trained cap / no_cap detector (cap_v4_640/best.pt).
 q or Esc or window-close to quit.  Optional arg: camera index (default 0).
 """
 import sys, time
 import cv2
 from ultralytics import YOLO
 
-W = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/cap_runs/synth_cap_v1_640/weights/best.pt"
+W = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/4_eksperimen/cap/cap_runs/cap_v4_640/weights/best.pt"
 CAM = int(sys.argv[1]) if len(sys.argv) > 1 else 0
 CONF = 0.35
 COLOR = {0: (0, 200, 0), 1: (0, 0, 255)}          # cap green, no_cap red
 NAME = {0: "cap", 1: "no_cap"}
-WIN = "cap / no_cap  -  best.pt   [q=quit]"
+WIN = "cap_v4 / no_cap  -  best.pt   [q=quit]"
 
 model = YOLO(W)
 cap = cv2.VideoCapture(CAM, cv2.CAP_DSHOW)

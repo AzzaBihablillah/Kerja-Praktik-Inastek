@@ -5,7 +5,7 @@ name-sorted order = shoot order = brand order, chunked 20 per bottle.
 """
 import glob, os, csv, shutil
 
-RAW = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/shoot_v1_raw"
+RAW = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/primary/2026-09-02_shoot_v1_raw"
 OUT = "C:/Users/ASUS/D/project/Kerja-Praktik-Inastek/datasets/shoot_v1"
 
 BOTTLES = [
