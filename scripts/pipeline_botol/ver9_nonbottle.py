@@ -98,8 +98,31 @@ def evaluate(pt, meta):
     print("\n".join(L), flush=True)
 
 
-def build_latih():
+def bottle_cutouts(belts):
+    """ver9b: botol asli sebagai potongan ber-alpha (cara tempel SAMA dengan negatif TACO) agar tepi tempelan tidak informatif.
+    Sumber: botol belt latih (C13/W16/P15, mask elips berhalus) + botol studio bernomor GENAP (ganjil disimpan untuk uji)."""
+    pool = []
+    for n, im, boxes in belts:
+        for c, (x1, y1, x2, y2) in boxes:
+            if c != 0:
+                continue
+            x1, y1, x2, y2 = int(max(0, x1)), int(max(0, y1)), int(x2), int(y2); cc = im[y1:y2, x1:x2].copy(); h, w = cc.shape[:2]
+            if h < 20 or w < 20:
+                continue
+            a = np.zeros((h, w), np.uint8); cv2.ellipse(a, (w // 2, h // 2), (int(w * 0.52), int(h * 0.56)), 0, 0, 360, 255, -1)
+            pool.append(dict(rgba=np.dstack([cc, cv2.GaussianBlur(a, (9, 9), 0)])))
+    for f in sorted(glob.glob(f"{DS}/_arsip/eksperimen_cap_lama/cap_shoot_v1_cutout/nohand/b*.png")):
+        if int(os.path.basename(f)[1:3]) % 2 == 0:
+            s = cv2.imread(f, cv2.IMREAD_UNCHANGED)
+            if s is not None and s.shape[2] == 4:
+                pool.append(dict(rgba=s))
+    return pool
+
+
+def build_latih(variant="a"):
     from ultralytics import YOLO  # noqa: F401
+    global LAT
+    LAT = f"{OUT}/latih_taco" + ("" if variant == "a" else f"_{variant}")
     shutil.rmtree(LAT, ignore_errors=True); os.makedirs(f"{LAT}/images"); os.makedirs(f"{LAT}/labels")
     objs = load_objects()["latih"]; rng = random.Random(3)
     print("objek latih:", len(objs), flush=True)
@@ -112,6 +135,9 @@ def build_latih():
         boxes = [(int(c), ((float(x) - float(w) / 2) * W, (float(y) - float(h) / 2) * H, (float(x) + float(w) / 2) * W, (float(y) + float(h) / 2) * H))
                  for c, x, y, w, h in lab]
         belts.append((n, im, boxes))
+    bpool = bottle_cutouts(belts) if variant == "b" else None
+    if bpool:
+        print("potongan botol ber-alpha:", len(bpool), flush=True)
     k = 0
     for rep in range(2):
         for n, im0, boxes in belts:
@@ -121,7 +147,12 @@ def build_latih():
                 b = paste_object(im, objs[rng.randrange(len(objs))], taken, rng); k += 1
                 if b:
                     taken.append((b[0] - 10, b[1] - 10, b[2] + 10, b[3] + 10)); lines.append(yolo_line(1, b, W, H))
-            if rng.random() < 0.5:
+            if bpool:                                                  # ver9b: jumlah tempelan botol ~ jumlah tempelan negatif
+                for _ in range(rng.choice([1, 2, 2])):
+                    b = paste_object(im, bpool[rng.randrange(len(bpool))], taken, rng)
+                    if b:
+                        taken.append((b[0] - 10, b[1] - 10, b[2] + 10, b[3] + 10)); lines.append(yolo_line(0, b, W, H))
+            elif rng.random() < 0.5:
                 sn, sim, sb = belts[rng.randrange(len(belts))]; bb = [b for c, b in sb if c == 0]
                 if bb:
                     res = paste_bottle(im, sim, bb[0], taken, rng)
@@ -143,19 +174,19 @@ def build_latih():
     return fs
 
 
-def train(fs):
+def train(fs, name="ver9"):
     from ultralytics import YOLO
     old = [l.strip().replace("\\", "/").split("/det_data/")[-1] for l in open(f"{DS}/4_eksperimen/cairan/final2/ver8b_train.txt") if l.strip()]
     tr = [f"{DD}/{p}" for p in old]
     assert all(os.path.exists(p) for p in tr[:50]), "path data ver8b tidak ditemukan"
     tr += [f.replace("\\", "/") for f in fs]
-    open(f"{OUT}/ver9_train.txt", "w").write("\n".join(tr) + "\n")
-    open(f"{OUT}/ver9.yaml", "w").write(f"train: {OUT}/ver9_train.txt\nval: {OUT}/old_test.txt\nnames:\n  0: bottle\n  1: non_bottle\n")
-    print("latih ver9:", len(tr), "foto (ver8b", len(old), "+ sintetis", len(fs), ")", flush=True)
-    YOLO(V7).train(data=f"{OUT}/ver9.yaml", epochs=10, imgsz=640, batch=16, workers=0, seed=0, deterministic=True, patience=0, plots=False,
-                   verbose=False, project=OUT, name="ver9", exist_ok=True, hsv_h=0.0, hsv_s=0.3, hsv_v=0.3, degrees=0, fliplr=0.5,
+    open(f"{OUT}/{name}_train.txt", "w").write("\n".join(tr) + "\n")
+    open(f"{OUT}/{name}.yaml", "w").write(f"train: {OUT}/{name}_train.txt\nval: {OUT}/old_test.txt\nnames:\n  0: bottle\n  1: non_bottle\n")
+    print(f"latih {name}:", len(tr), "foto (ver8b", len(old), "+ sintetis", len(fs), ")", flush=True)
+    YOLO(V7).train(data=f"{OUT}/{name}.yaml", epochs=10, imgsz=640, batch=16, workers=0, seed=0, deterministic=True, patience=0, plots=False,
+                   verbose=False, project=OUT, name=name, exist_ok=True, hsv_h=0.0, hsv_s=0.3, hsv_v=0.3, degrees=0, fliplr=0.5,
                    flipud=0.0, mosaic=1.0, close_mosaic=3)
-    return f"{OUT}/ver9/weights/last.pt"
+    return f"{OUT}/{name}/weights/last.pt"
 
 
 if __name__ == "__main__":
@@ -166,4 +197,6 @@ if __name__ == "__main__":
         for pt in (sys.argv[2:] or [V7, V8B]):
             evaluate(pt, meta)
     elif cmd == "latih":
-        evaluate(train(build_latih()), meta)
+        evaluate(train(build_latih("a"), "ver9"), meta)
+    elif cmd == "latih_b":                                             # ver9b: + botol ber-alpha (mitigasi jalan pintas tempelan)
+        evaluate(train(build_latih("b"), "ver9b"), meta)

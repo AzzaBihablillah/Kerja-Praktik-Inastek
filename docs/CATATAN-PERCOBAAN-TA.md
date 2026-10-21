@@ -234,6 +234,26 @@ Kesimpulan: resolusi 720p, deteksi tutup di area botol, dan FP16 **tidak menguba
 ### L-9 Model final
 `datasets/4_eksperimen/cairan/final/` (belt W16 + C13) dan `final2/` (+ pilot dan 28 foto tambahan). Keduanya tidak punya uji bersih; akurasi = hasil CV di atas. Belum dipasang di server (lingkup Capstone 1).
 
+## 4b. Percobaan detektor botol vs non-botol dengan negatif TACO-tempel (21 Okt)
+Kode: `scripts/pipeline_botol/` (`taco_paste.py`, `ver9_nonbottle.py`, `cek_jalan_pintas.py`). Hasil: `datasets/4_eksperimen/botol/`.
+Data negatif lama (data tim, `old_*`) ternyata sudah foto NYATA di belt rig lama (sabun, kaleng, karton, kemasan); yang belum ada: plastik film, kantong, gelas, plastik diremas. Ditemukan juga 1 contoh botol Aqua berlabel `non_bottle` di data lama (kemungkinan salah label, belum diaudit).
+
+**Metode.** Objek TACO (CC BY 4.0) dipotong dengan poligon segmentasi asli dan ditempel ke foto belt (rotasi, skala 15–40% lebar, tepi dihaluskan, kecerahan disesuaikan). Split per gambar TACO (id % 5 == 0 = uji). Latar latih = foto belt yang sudah ada di data ver8b; latar uji = sesi 20 Okt (tak pernah dilatih detektor). Resep latih = resep ver8b (dari ver7, 10 epoch, data ver8b + 672 foto sintetis).
+
+| ukuran (ambang sistem: bottle conf ≥ 0,35) | ver7 | ver8b (dipakai) | ver9 | **ver9b** |
+|---|---|---|---|---|
+| A. sampah TACO-tempel diterima sebagai botol (328 objek uji) | 11,0% | 19,5% (kaleng 10/23, kantong 7/16) | 0,0% | **3,0%** |
+| B/C. botol asli sesi 20 Okt terdeteksi (117) | 98/117 | 117/117 | 117/117 | **117/117** |
+| D. old_test 284 foto nyata: recall bottle / non_bottle | 0,999 / 1,000 | 0,990 / 0,974 | 1,000 / 0,977 | **1,000 / 0,986** |
+| S1. botol studio (tak dilatih) ditempel dengan cara sama: diterima | 74,8% | 41,1% | **1,9%** | 76,6% |
+| S2. botol belt 20 Okt ditempel (mask elips): diterima | 60,8% | 48,0% | **5,9%** | 97,1% |
+| E. plastik bening diremas, foto nyata alas abu (3 foto) | 3/3 diterima | 1/3 | 3/3 | 3/3 |
+
+**Temuan 1 – jalan pintas tempelan.** ver9 (hanya negatif yang ditempel) menolak 100% sampah tempelan, tetapi juga menolak 94–98% **botol asli** yang ditempel dengan cara sama: ia belajar "bekas tempelan = non_bottle", bukan bentuk sampah. **ver9 ditolak.** Uji kontrol S1/S2 ini wajib untuk setiap data sintetis tempel.
+**Temuan 2 – mitigasi.** ver9b menambahkan botol asli ber-alpha (372 potongan: botol belt latih bermask elips + botol studio bernomor genap) dengan cara tempel yang sama, jumlah seimbang dengan negatif. Hasil: sampah tempelan diterima turun 19,5% → 3,0%, botol tempelan tetap diterima (S1 77% vs ver8b 41%), tidak ada regresi pada botol asli maupun old_test (non_bottle recall naik 0,974 → 0,986).
+**Ancaman validitas.** (a) Semua perbaikan diukur pada data **sintetis**; sisa jalan pintas lain (tekstur foto Flickr TACO vs belt, bentuk mask poligon vs elips) belum bisa disingkirkan; S2 memakai mask elips yang sama dengan latih sehingga mungkin optimistis, S1 (mask rembg, botol tak dilatih) lebih jujur. (b) Satu-satunya negatif sulit NYATA (3 foto plastik diremas, alas abu, bukan belt) tetap diterima ver9b (ver8b 1/3); n terlalu kecil untuk disimpulkan, tetapi bukan bukti perbaikan.
+**Keputusan.** `botol_ver8b` tetap model utama. `datasets/3_model_final/botol_ver9b_kandidat.pt` = kandidat, dipakai hanya bila lolos uji foto NYATA di belt: plastik diremas, kantong, gelas, kaleng, serta uji iseng (foto botol di layar HP, gambar botol dicetak/ditempel busa) — status item 5/5b.
+
 ## 5. Percobaan model merek dan data lain
 - **Model merek lama** `brand_best_ver5` (aqua, coca_cola, le_mineral, unknown): `coca_cola` = produk perusahaan Coca-Cola (mitra), jadi Fanta/Sprite yang terbaca `coca_cola` benar. Pada 180 foto belt, produk non-Coca-Cola yang diterima sebagai `coca_cola`: BIG Cola 6/6, BIG Strawberry 6/6, Vit 6/6, Superindo merah 5/6, Aquviva 5/6. Sprite Nipis Mint → `unknown` 20/20 (luput).
 - **Perkiraan label salah di `brand2`:** dari contoh 48 kotak `unknown`, 8 adalah produk Coca-Cola Company (≈12%, ±140 kotak) — perkiraan, belum diverifikasi penuh.

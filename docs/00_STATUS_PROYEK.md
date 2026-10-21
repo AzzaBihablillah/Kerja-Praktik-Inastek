@@ -1,6 +1,6 @@
 # Status Proyek RVM — KP PT Inastek (dibaca pertama di room/sesi baru)
 
-Terakhir diperbarui: **21 Okt 2026**. Ringkasan konteks, keputusan, status, lokasi file, dan cara melanjutkan.
+Terakhir diperbarui: **21 Okt 2026** (sore: aplikasi kiosk `app/`). Ringkasan konteks, keputusan, status, lokasi file, dan cara melanjutkan.
 Rincian percobaan dan angka: `docs/CATATAN-PERCOBAAN-TA.md`. Riwayat dan keputusan: `docs/CATATAN-PROYEK.md`.
 
 ## 1. Konteks dan tujuan
@@ -27,7 +27,7 @@ Rincian percobaan dan angka: `docs/CATATAN-PERCOBAAN-TA.md`. Riwayat dan keputus
 ## 3. Status model (semua di `datasets/3_model_final/`)
 | modul | model | hasil utama | status |
 |---|---|---|---|
-| botol vs non-botol | `botol_ver8b.pt` (ver7 + foto belt) | ver7 hanya 20/40 botol berisi di belt; ver8 100%; regresi data lama 99,8% | siap; belum di server |
+| botol vs non-botol | `botol_ver8b.pt` (ver7 + foto belt); kandidat `botol_ver9b_kandidat.pt` (+ negatif TACO-tempel & botol ber-alpha) | ver8b: botol belt 100%, tapi menerima 19,5% sampah TACO-tempel; ver9b: 3,0%, tanpa regresi (CATATAN 4b) | ver8b dipakai; ver9b menunggu uji negatif NYATA di belt |
 | tutup | `cap_belt_final.pt` | CV 5-fold per botol 98,3% (CI 95,2–99,4) di sesi 13 Okt; **uji independen sesi 16/20 Okt 71%**: gagal di **tutup hitam** (Coke Zero, Powerade), lainnya ±94% | perlu data tutup hitam; server masih `cap_v4_640.pt` |
 | cairan berwarna | `cairan_RH.pt` (utama), `cairan_RA.pt` | validasi per kelompok cairan (21 botol, 13 cairan): **AUC 0,992**; biru dikenali walau tidak dilatih; putih/pucat dikenali | siap; demo live |
 | ukuran | luas kotak botol (batas 228k / 357k px², 1080p) | 21/22 botol benar (botol 400 ml terbaca kecil) | perlu kalibrasi per pemasangan |
@@ -58,6 +58,7 @@ scripts/                        (ikut git)
 docs/                           00_STATUS_PROYEK (ini), CATATAN-PERCOBAAN-TA, CATATAN-PROYEK, PETA-DATASET, DAFTAR-POTRET, laporan_kp/, _arsip/
 testing/cap version test/server.py   server PLC (FastAPI + snap7, bit MB10.0); path sudah diperbarui
 rvm_kp/                         sistem analisis KP (satu kode, backend pytorch/onnx/openvino/tensorrt), lihat rvm_kp/README.md
+app/                            aplikasi kiosk "Tukar Botol" (FastAPI + HTML biasa): layar mesin, QR klaim poin, akun/donasi/hadiah simulasi, panel operator; lihat app/README.md
 open_vino/, export_model/       milik tim (aplikasi Capstone 1, model bottle ver7 & brand ver5)
 ```
 
@@ -70,6 +71,7 @@ venv/Scripts/python.exe scripts/alat/qc_water_set.py --dir 1_foto_mentah/<folder
 venv/Scripts/python.exe scripts/pipeline_cairan/s28_cv_liquidgroup.py --recipe RH
 venv/Scripts/python.exe scripts/pipeline_cairan/s28b_report.py RA RH
 ```
+Aplikasi kiosk: `venv/Scripts/python.exe -m app --sim` (tanpa kamera/model) atau `-m app --backend pytorch --cam 1`; buka http://localhost:8000 (kiosk), /operator, dan QR klaim dari HP satu jaringan.
 Kamera belt (C922) biasanya index 1 setelah dicolok (index 0 = webcam laptop). Alat potret menolak jalan jika bukan 1080p.
 
 ## 6. Pekerjaan terbuka (urut prioritas)
@@ -78,8 +80,10 @@ Kamera belt (C922) biasanya index 1 setelah dicolok (index 0 = webcam laptop). A
 2. **(sebagian selesai 21 Okt)** `rvm_kp/`: kode sistem multi-backend, requirements laptop/Jetson, ekspor ONNX & OpenVINO (`datasets/3_model_final/ekspor/`), benchmark awal (`datasets/4_eksperimen/benchmark/`). **21 Okt sore:** profil `nano` (720p, tutup hanya di area botol, FP16) diuji: keputusan tidak berubah, komputasi −36%; ONNX opset 12 untuk TensorRT 8.2 terverifikasi; panduan `rvm_kp/JETSON-NANO.md`; paket salin `datasets/_paket_nano/` (171 MB). Sisa: engine TensorRT & benchmark DI Nano.
 3. Uji live di belt berjalan (butuh konfirmasi keamanan belt).
 4. Model merek `produk_mitra` vs lain (relabel `brand2`, ±12% `unknown` = produk Coca-Cola).
-5. Negatif non-botol: tempel potongan objek TACO ke foto belt; potret plastik bening diremas.
+5. Negatif non-botol: TACO-tempel diuji 21 Okt (ver9 ditolak: jalan pintas tempelan; ver9b kandidat, CATATAN 4b); tetap perlu foto NYATA di belt: plastik bening diremas, kantong, gelas plastik, kaleng.
+5b. **Uji iseng penguji (spoof):** foto botol di layar HP, gambar botol dicetak di kertas/ditempel ke busa. Kamera tunggal dari atas tidak bisa membedakan 2D vs 3D secara pasti. Rencana: potret 20-30 contoh tiap jenis di belt (HP berbagai kecerahan, cetak doff/glossy, busa bergambar) sebagai `non_bottle` + uji per jenis; isyarat yang bisa dipelajari: bingkai HP, moire layar, kertas tanpa transparansi/kilap PET. Pertahanan berlapis: model + keputusan multi-frame; opsi sensor murah non-load-cell (ToF/ultrasonik tinggi objek) bila mitra mengizinkan.
 6. Jetson Nano B01 4 GB (belum diservis): pasang JetPack 4.6.x + Docker `ultralytics/ultralytics:latest-jetson-jetpack4`, buat engine TensorRT FP16 di Nano, benchmark. Jika gagal, sistem di laptop.
+7. **Aplikasi kiosk `app/` (21 Okt, versi pengembangan):** alur sesi → keputusan per botol (voting antar-frame) → poin per ukuran → QR klaim → simpan ke akun / donasi; diuji di mode simulasi dan dengan model asli pada foto belt. Belum: uji live di belt, kalibrasi zona periksa, bonus merek, salin `app/` ke paket Nano.
 
 ## 7. Riwayat singkat
 | tanggal | peristiwa |
