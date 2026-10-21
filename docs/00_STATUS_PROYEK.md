@@ -28,7 +28,7 @@ Rincian percobaan dan angka: `docs/CATATAN-PERCOBAAN-TA.md`. Riwayat dan keputus
 | modul | model | hasil utama | status |
 |---|---|---|---|
 | botol vs non-botol | `botol_ver8b.pt` (ver7 + foto belt); kandidat `botol_ver9b_kandidat.pt` (+ negatif TACO-tempel & botol ber-alpha) | ver8b: botol belt 100%, tapi menerima 19,5% sampah TACO-tempel; ver9b: 3,0%, tanpa regresi (CATATAN 4b) | ver8b dipakai; ver9b menunggu uji negatif NYATA di belt |
-| tutup | `cap_belt_final.pt` | CV 5-fold per botol 98,3% (CI 95,2–99,4) di sesi 13 Okt; **uji independen sesi 16/20 Okt 71%**: gagal di **tutup hitam** (Coke Zero, Powerade), lainnya ±94% | perlu data tutup hitam; server masih `cap_v4_640.pt` |
+| tutup | **`cap_belt_v2.pt`** (21 Okt; 13 Okt + 16/20 Okt) | CV 5 fold per merek **99,0%** (CI 97,4–99,6), tutup hitam 95% (v1 `cap_belt_final`: 88,2% / 31,7%); mode ROI nano 416/½ = 99,0% | dipakai `rvm_kp`; server PLC lama masih `cap_v4_640.pt` |
 | cairan berwarna | `cairan_RH.pt` (utama), `cairan_RA.pt` | validasi per kelompok cairan (21 botol, 13 cairan): **AUC 0,992**; biru dikenali walau tidak dilatih; putih/pucat dikenali | siap; demo live |
 | ukuran | luas kotak botol (batas 228k / 357k px², 1080p) | 21/22 botol benar (botol 400 ml terbaca kecil) | perlu kalibrasi per pemasangan |
 | merek | `export_model/brand_best_ver5` (tim) | menerima BIG Cola/BIG Strawberry/Vit sebagai coca_cola; Sprite Nipis Mint luput | belum dikerjakan ulang |
@@ -75,7 +75,7 @@ Aplikasi kiosk: `venv/Scripts/python.exe -m app --sim` (tanpa kamera/model) atau
 Kamera belt (C922) biasanya index 1 setelah dicolok (index 0 = webcam laptop). Alat potret menolak jalan jika bukan 1080p.
 
 ## 6. Pekerjaan terbuka (urut prioritas)
-0. **Tutup hitam** (Coca-Cola Zero = produk mitra, Powerade): keputusan user 21 Okt = pakai foto sesi 16 & 20 Okt yang sudah ada. **Pra-label SIAP** (`scripts/pipeline_cap/prelabel_water.py` → `datasets/2_dataset_cap/cap_water_v1/`: 217 foto, 215 kotak model + 2 PLACEHOLDER, 60 foto tutup hitam wajib dicek di `PERLU-DITINJAU.txt`, zip unggah `cap_water_v1_roboflow.zip` 112 MB). MENUNGGU: user koreksi kotak di Roboflow → ekspor → latih ulang model tutup (13 Okt + 16/20 Okt) + CV per botol (`docs/CATATAN-PERCOBAAN-TA.md` C-9).
+0. ~~Tutup hitam~~ **SELESAI 21 Okt**: `cap_belt_v2` (CATATAN C-10/C-11). Sisa: uji live di belt; tambah produk bertutup hitam lain bila ada.
 1. Foto **botol kosong berlabel penuh** (botol bekas) di sesi yang sama dengan botol berisi; tambah **cairan merah** (sirup di botol bekas).
 2. **(sebagian selesai 21 Okt)** `rvm_kp/`: kode sistem multi-backend, requirements laptop/Jetson, ekspor ONNX & OpenVINO (`datasets/3_model_final/ekspor/`), benchmark awal (`datasets/4_eksperimen/benchmark/`). **21 Okt sore:** profil `nano` (720p, tutup hanya di area botol, FP16) diuji: keputusan tidak berubah, komputasi −36%; ONNX opset 12 untuk TensorRT 8.2 terverifikasi; panduan `rvm_kp/JETSON-NANO.md`; paket salin `datasets/_paket_nano/` (171 MB). Sisa: engine TensorRT & benchmark DI Nano.
 3. Uji live di belt berjalan (butuh konfirmasi keamanan belt).

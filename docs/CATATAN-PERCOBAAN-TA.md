@@ -52,6 +52,8 @@ Rincian: `laporan_kp/laporan-deteksi-cap-nocap.md` dan `CATATAN-PROYEK.md`.
 | C-7 | baseline `cap_v4` di belt | 97,8% di 640; **92,8% di 960; ±76% di 1280** | keunggulan fine-tune = ketahanan terhadap skala input, bukan lonjakan akurasi di skala deploy |
 | C-8 | pelabelan | box dari model lalu dikoreksi manual: 180/180 tepat 1 box, 124 sama, 52 digeser kecil | box ketat leher/cincin |
 | C-9 | **uji independen** `cap_belt_final` di sesi 16 & 20 Okt (217 foto, 21 botol, tidak pernah dilatih; 21 Okt, `rvm_kp/uji_profil.py`) | **71%** (154/217): bertutup 124/181, tanpa tutup 30/36, 36 foto tutup tidak terdeteksi. Tanpa Coca-Cola Zero & Powerade: ±94% (148/157) | kesalahan terkumpul di **tutup hitam** (Coke Zero b02/b05/b13: 37 salah; Powerade b01/b12: 17 salah), tutup hitam menempel di lajur plastik hitam belt; data latih 13 Okt tidak punya tutup hitam. **Angka 98,3% (C-6) hanya berlaku untuk jenis tutup yang ada di data latih.** Perlu foto botol bertutup hitam (bertutup + tanpa tutup) lalu latih ulang dan CV per botol |
+| C-10 | **model tutup v2** (`cap_belt_v2`, 21 Okt): + 217 foto sesi 16/20 Okt (kotak pra-label model, dikoreksi user di Roboflow v2; 7 kotak diubah). CV 5 fold **per merek** (32 merek; botol isi ulang bisa botol fisik yang sama), resep sama C-6, dua model per fold: hanya 13 Okt vs gabung (`scripts/pipeline_cap/cv_cap_v2.py`) | full-frame 640: **88,2% → 99,0%** (393/397, CI 97,4–99,6); **tutup hitam 31,7% → 95,0%** (57/60); sesi 13 Okt tetap 99–100%. Coke Zero yang TIDAK dilatih dikenali setelah melihat tutup hitam Powerade (fold 0: 50/76 → 75/76) | `cap_belt_v2` dipakai `rvm_kp` |
+| C-11 | setelan mode ROI (profil nano) untuk v2, diuji ulang dengan model fold yang sama (`cv_cap_v2_roi.py`) | kanvas 320 skala 1/3 conf 0,25: 380/397 (Powerade 10/20, 4 tak terdeteksi); **kanvas 416 skala 1/2 conf 0,03: 393/397 = full-frame** (Powerade 17/20, Coke Zero 40/40, 0 tak terdeteksi) | ROI 416/½/0,03 dipakai. Catatan: setelan dipilih dari 7 kandidat pada data CV yang sama (bias seleksi kecil); GFLOPs tutup 3,5 (vs 8,2 full-frame) |
 
 Kesalahan sisa model final (3/180): tutup biru berpita merah → no_cap; leher putih berulir → cap (0,86); leher bening + cincin kuning → cap (0,54).
 
@@ -278,7 +280,7 @@ Peta lengkap dengan proporsi per model: `PETA-DATASET-19-OKT.md`. Temuan utama: 
 - P15 punya confound; hanya dipakai sebagai uji, tidak pernah dilatih.
 - Level isi `seperempat` tidak konsisten (sebagian hampir penuh, sebagian hampir kosong).
 - Belum diuji pada belt bergerak dan di Jetson.
-- Model tutup belum pernah melihat tutup hitam (C-9): Coca-Cola Zero dan Powerade sering salah/tidak terdeteksi.
+- Model tutup: tutup hitam sudah dilatih (C-10, v2) tetapi baru 2 produk bertutup hitam (Coke Zero, Powerade); Powerade masih 17/20 (tutup sport lebar). Semua uji = foto statis.
 - Hasil "tidak membantu" untuk data luar berlaku untuk resep dan data yang dicoba, bukan bukti umum.
 
 ## 9. Pertanyaan yang masih terbuka

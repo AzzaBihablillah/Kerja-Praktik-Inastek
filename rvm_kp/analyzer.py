@@ -137,7 +137,7 @@ class RVMAnalyzer:
             t = time.perf_counter()
             if self.cap_mode == "roi":
                 cv, to_frame = roi_canvas(frame, x1, y1, x2, y2, self.roi_imgsz, self.roi_scale * 1920 / W, config.CAP_ROI_MARGIN)
-                cap, cconf, _ = self._best_cap(self._pred(self.cap, cv, self.roi_imgsz, config.CONF_CAP).boxes)
+                cap, cconf, _ = self._best_cap(self._pred(self.cap, cv, self.roi_imgsz, config.CONF_CAP_ROI).boxes)
             else:                                                   # cara lama: tutup full-frame dicocokkan lewat posisi x
                 caps = [c for c in rc.boxes if x1 - 20 <= float(c.xyxy[0][0] + c.xyxy[0][2]) / 2 <= x2 + 20]
                 cap, cconf, _ = self._best_cap(caps)

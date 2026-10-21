@@ -1,7 +1,7 @@
 """Ekspor model .pt ke format perangkat lain (hasil ke datasets/3_model_final/ekspor/).
   python -m rvm_kp.export_models --format onnx openvino                (laptop)
   python -m rvm_kp.export_models --format engine --half --workspace 1  (DI Jetson Nano, di dalam Docker JetPack 4; ±10-20 menit/model)
-Model tutup diekspor dua kali: ukuran full-frame (cap_belt_final.*) dan ukuran kanvas area botol (cap_belt_final_roi.*).
+Model tutup diekspor dua kali: ukuran full-frame (cap_belt_v2.*) dan ukuran kanvas area botol (cap_belt_v2_roi.*).
 Opset ONNX default 12: TensorRT 8.2 (JetPack 4.6, Jetson Nano) tidak menjamin opset baru; opset 12 cukup untuk semua operasi YOLOv8.
 Catatan: .engine terikat versi TensorRT & GPU tempat ia dibuat; JANGAN disalin dari laptop ke Jetson."""
 import argparse, os, shutil
@@ -10,8 +10,8 @@ from .config import M, E, IMGSZ_BOTTLE, IMGSZ_CAP_FULL, IMGSZ_LIQUID, CAP_ROI_IM
 
 MODELS = {
     "botol_ver8b": (f"{M}/botol_ver8b.pt", IMGSZ_BOTTLE),
-    "cap_belt_final": (f"{M}/cap_belt_final.pt", IMGSZ_CAP_FULL),
-    "cap_belt_final_roi": (f"{M}/cap_belt_final.pt", CAP_ROI_IMGSZ),
+    "cap_belt_v2": (f"{M}/cap_belt_v2.pt", IMGSZ_CAP_FULL),
+    "cap_belt_v2_roi": (f"{M}/cap_belt_v2.pt", CAP_ROI_IMGSZ),
     "cairan_RH": (f"{M}/cairan_RH.pt", IMGSZ_LIQUID),
 }
 
