@@ -256,6 +256,20 @@ Data negatif lama (data tim, `old_*`) ternyata sudah foto NYATA di belt rig lama
 **Ancaman validitas.** (a) Semua perbaikan diukur pada data **sintetis**; sisa jalan pintas lain (tekstur foto Flickr TACO vs belt, bentuk mask poligon vs elips) belum bisa disingkirkan; S2 memakai mask elips yang sama dengan latih sehingga mungkin optimistis, S1 (mask rembg, botol tak dilatih) lebih jujur. (b) Satu-satunya negatif sulit NYATA (3 foto plastik diremas, alas abu, bukan belt) tetap diterima ver9b (ver8b 1/3); n terlalu kecil untuk disimpulkan, tetapi bukan bukti perbaikan.
 **Keputusan.** `botol_ver8b` tetap model utama. `datasets/3_model_final/botol_ver9b_kandidat.pt` = kandidat, dipakai hanya bila lolos uji foto NYATA di belt: plastik diremas, kantong, gelas, kaleng, serta uji iseng (foto botol di layar HP, gambar botol dicetak/ditempel busa) — status item 5/5b.
 
+**Lanjutan 22 Okt – ver9c (+ TrashNet).** TrashNet (MIT, Thung & Yang 2016; 2.527 foto objek tunggal di alas putih) dipotong dengan rembg (u2net lokal), hanya objek UTUH (794). Kelas plastic dipilah visual oleh Claude (belum diverifikasi manusia): 86 botol PET = `bottle`, 102 plastik lain = `non_bottle`, 49 ragu dibuang (jerigen HDPE, botol isi ulang, tampak ujung, toples); kaca, logam, kertas, kardus, sampah = `non_bottle`. Tujuan: positif DAN negatif dari sumber luar yang SAMA (pelajaran L-7/peta dataset), agar "sumber asing = non_bottle" tidak bisa dipakai sebagai jalan pintas. Split per nomor foto (nomor % 5 == 0 = uji). ver9c = resep ver9b + 50% negatif dari TrashNet + 30% tempelan botol dari PET TrashNet. Skrip: `scripts/pipeline_botol/trashnet_prep.py`, `uji_trashnet.py`.
+
+| ukuran | ver8b (dipakai) | ver9b | **ver9c** |
+|---|---|---|---|
+| A. sampah TACO-tempel diterima (328) | 19,5% | 3,0% | 8,8% |
+| F. non-botol TrashNet ditahan diterima (382 tempelan) | 21% (kaca 21/108, kaleng 30/106) | 3% | **7%** (kaca 16/108, kaleng 2/106) |
+| F. botol PET TrashNet ditahan diterima (44) — kontrol | 64% | **7%** ✗ | **75%** |
+| S1/S2. botol studio/belt ditempel diterima — kontrol | 41% / 48% | 77% / 97% | **93,5% / 100%** |
+| C. botol asli 20 Okt | 117/117 | 117/117 | 117/117 |
+| D. old_test recall bottle / non_bottle | 0,990 / 0,974 | 1,000 / 0,986 | 1,000 / 0,985 |
+| E. plastik diremas nyata (3) diterima | 1/3 | 3/3 | 3/3 |
+
+**Temuan 3 – jalan pintas "sumber asing".** ver9b tampak terbaik pada negatif luar (3%), tetapi juga menolak 93% botol PET dari sumber luar yang sama: ia belajar "objek bergaya foto luar = non_bottle". ver9c, yang melihat botol PET dari sumber yang sama, menerima 75% PET TrashNet sambil hanya menerima 7% non-botol TrashNet: pemisahan berdasarkan jenis objek, bukan sumber. **ver9c = kandidat terbaik** (`3_model_final/botol_ver9c_kandidat.pt`), menggantikan ver9b sebagai kandidat. Negatif tersulit: botol kaca (15% masih diterima). Tetap sintetis; plastik diremas nyata (E) belum membaik; keputusan ganti ver8b menunggu foto negatif NYATA di belt.
+
 ## 5. Percobaan model merek dan data lain
 - **Model merek lama** `brand_best_ver5` (aqua, coca_cola, le_mineral, unknown): `coca_cola` = produk perusahaan Coca-Cola (mitra), jadi Fanta/Sprite yang terbaca `coca_cola` benar. Pada 180 foto belt, produk non-Coca-Cola yang diterima sebagai `coca_cola`: BIG Cola 6/6, BIG Strawberry 6/6, Vit 6/6, Superindo merah 5/6, Aquviva 5/6. Sprite Nipis Mint → `unknown` 20/20 (luput).
 - **Perkiraan label salah di `brand2`:** dari contoh 48 kotak `unknown`, 8 adalah produk Coca-Cola Company (≈12%, ±140 kotak) — perkiraan, belum diverifikasi penuh.

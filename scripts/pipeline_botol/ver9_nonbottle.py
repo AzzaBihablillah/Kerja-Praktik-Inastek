@@ -1,6 +1,7 @@
 """Detektor botol vs non-botol: uji negatif TACO-tempel, dan (bila perlu) latih ver9 = ver8b + negatif TACO-tempel.
   python scripts/pipeline_botol/ver9_nonbottle.py uji  [model.pt ...]   bangun set uji sintetis (sekali) + evaluasi model
   python scripts/pipeline_botol/ver9_nonbottle.py latih                 bangun data latih sintetis + latih ver9 (resep ver8b)
+  python scripts/pipeline_botol/ver9_nonbottle.py latih_b / latih_c     ver9b (+botol ber-alpha) / ver9c (+ potongan TrashNet)
 Keluaran: datasets/4_eksperimen/botol/ (uji_taco/, latih_taco/, ver9/, hasil_uji_<model>.txt, ringkasan.txt)
 
 Evaluasi (ambang sistem: kelas bottle conf >= 0.35):
@@ -119,6 +120,25 @@ def bottle_cutouts(belts):
     return pool
 
 
+def trashnet_objects(split):
+    """Potongan TrashNet utuh (rembg). split 'latih' = nomor % 5 != 0, 'uji' = nomor % 5 == 0.
+    Kembalikan (negatif, botol_pet): negatif = semua kelas kecuali plastic yang dipilah PET (trashnet_pilah.csv, pilah visual Claude)."""
+    T = f"{DS}/5_data_luar/_dl_trashnet"
+    pil = {int(r["nomor"]): r["pet"] for r in csv.DictReader(open(f"{T}/trashnet_pilah.csv"))}
+    pet = {n for n, v in pil.items() if v == "1"}; ragu = {n for n, v in pil.items() if v == "x"}   # ragu (HDPE, botol isi ulang, dll.) dibuang
+    neg, pos = [], []
+    for f in sorted(glob.glob(f"{T}/cutout/*/*.png")):
+        c = os.path.basename(os.path.dirname(f)); n = os.path.basename(f)[:-4]; num = int(n.replace(c, ""))
+        if (num % 5 == 0) != (split == "uji") or (c == "plastic" and num in ragu):
+            continue
+        rgba = cv2.imread(f, cv2.IMREAD_UNCHANGED)
+        if rgba is None or rgba.ndim != 3 or rgba.shape[2] != 4:
+            continue
+        o = dict(rgba=rgba, cat=f"trashnet_{c}" + ("_PET" if c == "plastic" and num in pet else ""), img=n)
+        (pos if c == "plastic" and num in pet else neg).append(o)
+    return neg, pos
+
+
 def build_latih(variant="a"):
     from ultralytics import YOLO  # noqa: F401
     global LAT
@@ -135,21 +155,28 @@ def build_latih(variant="a"):
         boxes = [(int(c), ((float(x) - float(w) / 2) * W, (float(y) - float(h) / 2) * H, (float(x) + float(w) / 2) * W, (float(y) + float(h) / 2) * H))
                  for c, x, y, w, h in lab]
         belts.append((n, im, boxes))
-    bpool = bottle_cutouts(belts) if variant == "b" else None
+    bpool = bottle_cutouts(belts) if variant in ("b", "c") else None
+    tneg, tpos = trashnet_objects("latih") if variant == "c" else ([], [])
     if bpool:
-        print("potongan botol ber-alpha:", len(bpool), flush=True)
+        print("potongan botol ber-alpha:", len(bpool), "| TrashNet negatif", len(tneg), "PET", len(tpos), flush=True)
+
+    def pick_neg():
+        return tneg[rng.randrange(len(tneg))] if tneg and rng.random() < 0.5 else objs[rng.randrange(len(objs))]
+
+    def pick_pos():
+        return tpos[rng.randrange(len(tpos))] if tpos and rng.random() < 0.3 else bpool[rng.randrange(len(bpool))]
     k = 0
     for rep in range(2):
         for n, im0, boxes in belts:
             im = im0.copy(); H, W = im.shape[:2]
             taken = [(b[0] - 10, b[1] - 10, b[2] + 10, b[3] + 10) for _, b in boxes]; lines = [yolo_line(c, b, W, H) for c, b in boxes]
             for _ in range(rng.choice([1, 2, 2])):
-                b = paste_object(im, objs[rng.randrange(len(objs))], taken, rng); k += 1
+                b = paste_object(im, pick_neg(), taken, rng); k += 1
                 if b:
                     taken.append((b[0] - 10, b[1] - 10, b[2] + 10, b[3] + 10)); lines.append(yolo_line(1, b, W, H))
             if bpool:                                                  # ver9b: jumlah tempelan botol ~ jumlah tempelan negatif
                 for _ in range(rng.choice([1, 2, 2])):
-                    b = paste_object(im, bpool[rng.randrange(len(bpool))], taken, rng)
+                    b = paste_object(im, pick_pos(), taken, rng)
                     if b:
                         taken.append((b[0] - 10, b[1] - 10, b[2] + 10, b[3] + 10)); lines.append(yolo_line(0, b, W, H))
             elif rng.random() < 0.5:
@@ -198,5 +225,7 @@ if __name__ == "__main__":
             evaluate(pt, meta)
     elif cmd == "latih":
         evaluate(train(build_latih("a"), "ver9"), meta)
+    elif cmd == "latih_c":                                             # ver9c: ver9b + potongan TrashNet (PET = bottle; kaca/kaleng/kertas/plastik lain = non_bottle)
+        evaluate(train(build_latih("c"), "ver9c"), meta)
     elif cmd == "latih_b":                                             # ver9b: + botol ber-alpha (mitigasi jalan pintas tempelan)
         evaluate(train(build_latih("b"), "ver9b"), meta)
