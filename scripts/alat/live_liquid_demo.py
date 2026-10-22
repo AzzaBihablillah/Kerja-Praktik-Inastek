@@ -17,10 +17,10 @@ sys.path.insert(0, os.path.join(REPO, "scripts", "pipeline_cairan"))
 MODELS = os.path.join(REPO, "datasets", "3_model_final")
 from common import fold_crop  # noqa: E402
 
-DET = os.path.join(MODELS, "botol_ver8b.pt")
+DET = os.path.join(MODELS, "botol_ver9c.pt")      # 22 Okt: ver9c (dulu ver8b)
 CLS = {"RH": os.path.join(MODELS, "cairan_RH.pt"), "RA": os.path.join(MODELS, "cairan_RA.pt")}
 MODES = ["RH", "RA", "RH+RA"]
-CAP = os.path.join(MODELS, "cap_belt_final.pt")
+CAP = os.path.join(MODELS, "cap_belt_v2.pt")     # 22 Okt: v2 (dulu cap_belt_final)
 AREA_KECIL_TANGGUNG, AREA_TANGGUNG_BESAR = 228_000, 357_000      # px^2 pada 1920x1080; kecil <=350 ml, tanggung 351-800, besar >800 (keputusan 20 Okt)
 
 ap = argparse.ArgumentParser()

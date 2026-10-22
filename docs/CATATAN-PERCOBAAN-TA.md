@@ -233,6 +233,14 @@ Kesimpulan: resolusi 720p, deteksi tutup di area botol, dan FP16 **tidak menguba
 
 **Ekspor untuk TensorRT 8.2:** ONNX opset 12, IR 7, input statis (botol 640, tutup full 640, tutup ROI 320, cairan 224). Hanya 14 jenis operasi standar (Conv, Sigmoid, Mul, Split, Add, Concat, MaxPool, Resize, Reshape, Transpose, Softmax, Slice, Sub, Div; classifier + GlobalAveragePool, Flatten, Gemm). Keluaran ONNX = `.pt` (selisih relatif maks 2,4×10⁻⁶). Kode `rvm_kp/` lolos cek sintaks Python 3.8. Engine `.engine` tetap harus dibuat di Nano.
 
+### L-17 Uji LIVE di belt berjalan dengan aplikasi kiosk + PLC (22 Okt sore)
+Aplikasi `app/` (`python -m app --backend pytorch --cam 1 --plc`), profil nano (720p), model aktif: `botol_ver9c`, `cap_belt_v2`, `cairan_RH`. Area belt dinyatakan aman oleh user.
+- **Belt jalan terus (cara awal):** suara tutup antar-frame bercampur (mis. 10 tanpa tutup / 5 bertutup / 5 tak terbaca dalam satu botol); user: cairan "tidak terlihat bekerja" — sebagian karena layar hanya menampilkan alasan pertama (tutup). Diperbaiki: alasan gabungan "bertutup dan masih ada isinya".
+- **Berhenti-lalu-pindai (usul user):** pusat botol masuk zona 40–60% lebar → PLC MB10.0 OFF → jeda → 3 frame DIAM → voting → ON. Berhenti total 0,9–1,3 s (jeda 0,5 s) dan 1,5–1,8 s (jeda 1,0 s); PLC selalu merespons. Frame diam disimpan (`datasets/1_foto_mentah/2026-10-22_scan_app/`, `SCAN.csv` + label user). Jeda 1,0 s: frame tajam (tidak ada blur).
+- **Hasil 30 botol berlabel user** (jeda 1,0 s): tutup **30/30** benar (termasuk tutup hitam Coca-Cola), selalu bulat 3/3 frame. Cairan: kosong **16/16** benar (0 salah alarm); berisi **10/14** — luput 3× Fanta berisi minuman oren yang di kamera tampak kuning PUCAT (p 0,00–0,29) dan 1× Coca-Cola berisi air bening (p 0,49). **Di luar dugaan: air bening di botol air mineral (Le Minerale, Cheers) terdeteksi 5/5 (p 1,00)** — tetapi semua bertutup, n kecil, dan air bening tetap di luar lingkup resmi; jangan diklaim tanpa uji tanpa tutup & botol lain.
+- Ukuran: botol 400 ml ramping (#17) terbaca "kecil" (luas kotak kecil) → batas berbasis luas lemah untuk botol ramping; pertimbangkan panjang botol.
+- Kesimpulan: stop-and-scan dijadikan mode default aplikasi (`app/config.py` STOP_SCAN, `--terus` untuk mematikan, `--jeda` detik). Kelemahan tersisa = warna pucat & botol berlabel penuh (latih ulang dengan sesi 22 Okt + frame scan).
+
 ### L-9 Model final
 `datasets/4_eksperimen/cairan/final/` (belt W16 + C13) dan `final2/` (+ pilot dan 28 foto tambahan). Keduanya tidak punya uji bersih; akurasi = hasil CV di atas. Belum dipasang di server (lingkup Capstone 1).
 
