@@ -270,6 +270,18 @@ Data negatif lama (data tim, `old_*`) ternyata sudah foto NYATA di belt rig lama
 
 **Temuan 3 – jalan pintas "sumber asing".** ver9b tampak terbaik pada negatif luar (3%), tetapi juga menolak 93% botol PET dari sumber luar yang sama: ia belajar "objek bergaya foto luar = non_bottle". ver9c, yang melihat botol PET dari sumber yang sama, menerima 75% PET TrashNet sambil hanya menerima 7% non-botol TrashNet: pemisahan berdasarkan jenis objek, bukan sumber. **ver9c = kandidat terbaik** (`3_model_final/botol_ver9c_kandidat.pt`), menggantikan ver9b sebagai kandidat. Negatif tersulit: botol kaca (15% masih diterima). Tetap sintetis; plastik diremas nyata (E) belum membaik; keputusan ganti ver8b menunggu foto negatif NYATA di belt.
 
+**Uji NYATA di belt (22 Okt, sesi `2026-10-22_nonbottle_v1`, 49 foto, belt mati) — penentu.** Kontrol positif = 64 foto botol PET sesi cairan hari yang sama (`2026-10-22_water_v1`). Diterima = ada kotak `bottle` conf ≥ 0,35 (`datasets/4_eksperimen/botol/uji_nyata_2026-10-22.txt`).
+
+| | ver7 | ver8b | ver9b | **ver9c** |
+|---|---|---|---|---|
+| non-botol nyata diterima (32 foto: kotak kacamata, gunting, HP, kardus, mouse, plastik bening diremas, bungkus jajan, tangan) | 3 | 13 | 8 | **7** |
+| kontrol botol PET terdeteksi (64) | 47 | 64 | 64 | **64** |
+| uji iseng: foto botol di layar HP (8) | 0 | 0 | 0 | 0 |
+| plastik bening diremas (4 foto, 1 benda) | 2 | 4 | 4 | 4 |
+| botol bukan minuman: hand sanitizer (3) / Listerine (4) | 0 / 0 | 3 / 4 | 2 / 3 | 3 / 4 |
+
+ver9c menurunkan salah terima non-botol nyata dari 13/32 (41%) ke 7/32 (22%) tanpa kehilangan botol (64/64), arah sama dengan uji sintetis. ver9b gagal di mouse (3/3) dan tangan tidak, ver8b menerima tangan 2/9 dan HP 2/5. Dengan ver9c, kotak botol nyaris sama dengan ver8b (IoU median 0,966 pada 103 foto botol), keputusan tutup 103/103 sama, cairan 69 vs 68 benar dari 87. **Keputusan 22 Okt: `botol_ver9c` menjadi detektor aktif `rvm_kp`** (ver8b disimpan). Keterbatasan: n kecil (32 foto dari ±8 benda, satu sesi); plastik bening diremas masih selalu lolos; foto HP bergambar botol ditolak semua model (bagus, tetapi baru 8 foto dari 1 HP); botol non-minuman (hand sanitizer, Listerine) diterima — perlu keputusan mitra apakah botol PET non-minuman diterima.
+
 ## 5. Percobaan model merek dan data lain
 - **Model merek lama** `brand_best_ver5` (aqua, coca_cola, le_mineral, unknown): `coca_cola` = produk perusahaan Coca-Cola (mitra), jadi Fanta/Sprite yang terbaca `coca_cola` benar. Pada 180 foto belt, produk non-Coca-Cola yang diterima sebagai `coca_cola`: BIG Cola 6/6, BIG Strawberry 6/6, Vit 6/6, Superindo merah 5/6, Aquviva 5/6. Sprite Nipis Mint → `unknown` 20/20 (luput).
 - **Perkiraan label salah di `brand2`:** dari contoh 48 kotak `unknown`, 8 adalah produk Coca-Cola Company (≈12%, ±140 kotak) — perkiraan, belum diverifikasi penuh.

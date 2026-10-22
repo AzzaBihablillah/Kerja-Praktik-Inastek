@@ -7,8 +7,8 @@ import glob, os, random, shutil
 from .config import REPO, M, E
 
 OUT = os.path.join(REPO, "datasets", "_paket_nano")
-PT = ["botol_ver8b.pt", "cap_belt_v2.pt", "cairan_RH.pt"]
-ONNX = ["botol_ver8b.onnx", "cap_belt_v2.onnx", "cap_belt_v2_roi.onnx", "cairan_RH.onnx"]
+PT = ["botol_ver9c.pt", "cap_belt_v2.pt", "cairan_RH.pt"]
+ONNX = ["botol_ver9c.onnx", "cap_belt_v2.onnx", "cap_belt_v2_roi.onnx", "cairan_RH.onnx"]
 SESI = "2026-10-20_water_v1"
 
 

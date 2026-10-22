@@ -15,13 +15,15 @@ CAP_ROI_SCALE = 1 / 2         # skala potongan relatif frame selebar 1920 px (= 
 CAP_ROI_MARGIN = 0.08         # tambahan tepi kotak botol (fraksi lebar/tinggi kotak)
 
 MODEL_SETS = {
-    "pytorch": dict(bottle=f"{M}/botol_ver8b.pt", cap=f"{M}/cap_belt_v2.pt", cap_roi=f"{M}/cap_belt_v2.pt", liquid=f"{M}/cairan_RH.pt"),
-    "onnx": dict(bottle=f"{E}/botol_ver8b.onnx", cap=f"{E}/cap_belt_v2.onnx", cap_roi=f"{E}/cap_belt_v2_roi.onnx", liquid=f"{E}/cairan_RH.onnx"),
-    "openvino": dict(bottle=f"{E}/botol_ver8b_openvino_model", cap=f"{E}/cap_belt_v2_openvino_model",
+    "pytorch": dict(bottle=f"{M}/botol_ver9c.pt", cap=f"{M}/cap_belt_v2.pt", cap_roi=f"{M}/cap_belt_v2.pt", liquid=f"{M}/cairan_RH.pt"),
+    "onnx": dict(bottle=f"{E}/botol_ver9c.onnx", cap=f"{E}/cap_belt_v2.onnx", cap_roi=f"{E}/cap_belt_v2_roi.onnx", liquid=f"{E}/cairan_RH.onnx"),
+    "openvino": dict(bottle=f"{E}/botol_ver9c_openvino_model", cap=f"{E}/cap_belt_v2_openvino_model",
                      cap_roi=f"{E}/cap_belt_v2_roi_openvino_model", liquid=f"{E}/cairan_RH_openvino_model"),
-    "tensorrt": dict(bottle=f"{E}/botol_ver8b.engine", cap=f"{E}/cap_belt_v2.engine", cap_roi=f"{E}/cap_belt_v2_roi.engine", liquid=f"{E}/cairan_RH.engine"),
+    "tensorrt": dict(bottle=f"{E}/botol_ver9c.engine", cap=f"{E}/cap_belt_v2.engine", cap_roi=f"{E}/cap_belt_v2_roi.engine", liquid=f"{E}/cairan_RH.engine"),
 }
 
+# Detektor botol: botol_ver9c (22 Okt; uji NYATA di belt: non-botol diterima 7/32 vs ver8b 13/32, kontrol PET 64/64 keduanya).
+#   Kembali ke ver8b: ganti 'botol_ver9c' -> 'botol_ver8b' di MODEL_SETS.
 # Model tutup: cap_belt_v2 (21 Okt) = 13 Okt + 16/20 Okt termasuk tutup hitam; CV per merek 99,0% (cap_belt_final: 88,2%).
 # Profil perangkat. "nano" = batasan Jetson Nano 4 GB B01: kamera 720p, tutup hanya di area botol, FP16, 4 core CPU.
 # Di laptop, profil "nano" MENIRU batasannya (bukan kecepatannya): angka kecepatan Nano hanya sah bila diukur di Nano.

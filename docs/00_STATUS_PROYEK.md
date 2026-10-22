@@ -27,7 +27,7 @@ Rincian percobaan dan angka: `docs/CATATAN-PERCOBAAN-TA.md`. Riwayat dan keputus
 ## 3. Status model (semua di `datasets/3_model_final/`)
 | modul | model | hasil utama | status |
 |---|---|---|---|
-| botol vs non-botol | `botol_ver8b.pt` (ver7 + foto belt); kandidat **`botol_ver9c_kandidat.pt`** (+ TACO & TrashNet, botol ber-alpha; ver9b disimpan) | ver8b: botol belt 100%, menerima ±20% sampah tempelan; ver9c: 7–9%, botol PET luar tetap diterima 75%, tanpa regresi (CATATAN 4b) | ver8b dipakai; ver9c menunggu uji negatif NYATA di belt |
+| botol vs non-botol | **`botol_ver9c.pt`** (22 Okt; ver7 + belt + TACO & TrashNet tempel, botol ber-alpha); `botol_ver8b.pt` cadangan | uji NYATA belt: non-botol diterima 7/32 (ver8b 13/32), botol PET 64/64; plastik bening diremas masih lolos (CATATAN 4b) | dipakai `rvm_kp` |
 | tutup | **`cap_belt_v2.pt`** (21 Okt; 13 Okt + 16/20 Okt) | CV 5 fold per merek **99,0%** (CI 97,4–99,6), tutup hitam 95% (v1 `cap_belt_final`: 88,2% / 31,7%); mode ROI nano 416/½ = 99,0% | dipakai `rvm_kp`; server PLC lama masih `cap_v4_640.pt` |
 | cairan berwarna | `cairan_RH.pt` (utama), `cairan_RA.pt` | validasi per kelompok cairan (21 botol, 13 cairan): **AUC 0,992**; biru dikenali walau tidak dilatih; putih/pucat dikenali | siap; demo live |
 | ukuran | luas kotak botol (batas 228k / 357k px², 1080p) | 21/22 botol benar (botol 400 ml terbaca kecil) | perlu kalibrasi per pemasangan |

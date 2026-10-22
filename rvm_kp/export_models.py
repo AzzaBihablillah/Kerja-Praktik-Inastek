@@ -9,7 +9,7 @@ from ultralytics import YOLO
 from .config import M, E, IMGSZ_BOTTLE, IMGSZ_CAP_FULL, IMGSZ_LIQUID, CAP_ROI_IMGSZ
 
 MODELS = {
-    "botol_ver8b": (f"{M}/botol_ver8b.pt", IMGSZ_BOTTLE),
+    "botol_ver9c": (f"{M}/botol_ver9c.pt", IMGSZ_BOTTLE),
     "cap_belt_v2": (f"{M}/cap_belt_v2.pt", IMGSZ_CAP_FULL),
     "cap_belt_v2_roi": (f"{M}/cap_belt_v2.pt", CAP_ROI_IMGSZ),
     "cairan_RH": (f"{M}/cairan_RH.pt", IMGSZ_LIQUID),

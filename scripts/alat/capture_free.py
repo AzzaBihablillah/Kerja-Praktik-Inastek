@@ -1,6 +1,7 @@
 """Potret bebas (tanpa protokol level/tutup) untuk NEGATIF non_bottle, mis. plastik bening diremas, kantong, gelas plastik.
   python capture_free.py --cam 1 --name plastik-bening-remas [--out DIR]
-Tombol: SPACE/s simpan | n ganti nama benda (ketik di terminal) | z undo | q keluar. 1920x1080 PNG, MANIFEST.csv."""
+Tombol: SPACE/s simpan | n ganti nama benda (KETIK LANGSUNG di jendela, Enter simpan, Esc batal) | z undo | q keluar.
+1920x1080 PNG, MANIFEST.csv. Daftar benda & nama: docs/DAFTAR-POTRET-22-OKT.md (botol PET kontrol: nama diawali 'pet-')."""
 import argparse, csv, datetime, os, sys, time
 import cv2
 
@@ -20,6 +21,7 @@ ok, f = cap.read()
 if not ok or f.shape[:2] != (1080, 1920):
     sys.exit(f"STOP: kamera index {a.cam} memberi {None if not ok else f.shape[1::-1]}, bukan 1920x1080. Jalankan capture_water.py --list.")
 name, msg = a.name, ""
+typing = None                                    # None = mode potret; str = sedang mengetik nama benda baru
 WIN = "potret bebas [SPACE simpan | n nama | z undo | q keluar]"
 cv2.namedWindow(WIN, cv2.WINDOW_NORMAL)
 while True:
@@ -27,8 +29,29 @@ while True:
     if not ok:
         continue
     v = cv2.resize(f, (960, 540)); cv2.rectangle(v, (0, 0), (960, 40), (0, 0, 0), -1)
-    cv2.putText(v, f"{name} | foto {len(rows)} | {msg}", (8, 27), 0, 0.6, (0, 255, 255), 2)
+    nb = sum(1 for r in rows if r[1] == name)
+    cv2.putText(v, f"{name} ({nb} foto) | total {len(rows)} | {msg}", (8, 27), 0, 0.6, (0, 255, 255), 2)
+    if typing is not None:
+        cv2.rectangle(v, (30, 200), (930, 330), (25, 25, 25), -1); cv2.rectangle(v, (30, 200), (930, 330), (0, 255, 255), 2)
+        cv2.putText(v, "NAMA BENDA BARU:", (50, 240), 0, 0.8, (0, 255, 255), 2)
+        cv2.putText(v, typing + "_", (50, 285), 0, 0.9, (255, 255, 255), 2)
+        cv2.putText(v, "Enter = simpan | Backspace = hapus | Esc = batal", (50, 318), 0, 0.5, (160, 160, 160), 1)
     cv2.imshow(WIN, v); k = cv2.waitKey(1) & 0xFF
+    if k == 255:
+        continue
+    if typing is not None:                       # mode mengetik: tombol lain nonaktif
+        if k == 13:
+            new = typing.strip().lower().replace(" ", "-")
+            if new:
+                name, msg = new, "nama diganti"
+            typing = None
+        elif k == 27:
+            typing, msg = None, "batal ganti nama"
+        elif k in (8, 127):
+            typing = typing[:-1]
+        elif 32 <= k <= 126:
+            typing += chr(k)
+        continue
     if k in (ord("q"), 27):
         break
     if k in (32, ord("s")):
@@ -37,7 +60,7 @@ while True:
         cv2.imwrite(os.path.join(a.out, fn), f, [cv2.IMWRITE_PNG_COMPRESSION, 3])
         rows.append([fn, name, datetime.datetime.now().isoformat(timespec="seconds")]); msg = f"disimpan {fn}"
     elif k == ord("n"):
-        name = input("nama benda baru: ").strip().replace(" ", "-") or name; msg = "nama diganti"
+        typing = ""
     elif k == ord("z") and rows:
         r = rows.pop()
         try:
