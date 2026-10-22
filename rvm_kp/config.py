@@ -37,7 +37,17 @@ CONF_BOTTLE = 0.35            # sama dengan server PLC
 CONF_CAP = 0.25               # mode full-frame (sama dengan server PLC)
 CONF_CAP_ROI = 0.03           # mode ROI: ambil kotak terbaik walau lemah (uji 21 Okt: 0 'tidak terdeteksi', akurasi = full-frame)
 LIQUID_THR = 0.5              # KALIBRASI saat pemasangan (skor model RH jenuh mendekati 1)
+# Gabungan model cairan (23 Okt, CV s32: rata-rata RH+RN salah 40/325 vs RH 45 vs RN 42; lebih stabil di warna pucat).
+# None = mati (hanya model 'liquid'). Aktifkan: LIQUID_EXTRA = f"{M}/cairan_RN.pt"  (backend pytorch; backend lain perlu ekspor RN).
+LIQUID_EXTRA = None
 # Ukuran dari luas kotak botol, dinyatakan dalam piksel^2 SETARA frame 1920 px (resolusi kamera lain dinormalisasi otomatis).
 # kecil <=350 ml, tanggung 351-800 ml, besar >800 ml (keputusan user 20 Okt). KALIBRASI per pemasangan (tinggi kamera).
 AREA_KECIL_TANGGUNG = 228_000
 AREA_TANGGUNG_BESAR = 357_000
+# Alternatif (23 Okt, scripts/alat/analisis_ukuran.py, 26 botol uji tinggalkan-satu-botol): PANJANG botol (sisi panjang kotak, setara
+# frame 1920 px) benar 24/26 vs luas 22/26 (luas salah di botol ramping 400 ml). Galon gemuk ditutup aturan luas: luas >= AREA_BESAR_PASTI -> besar.
+# Pilih dengan SIZE_RULE = "luas" (bawaan, cara lama) atau "panjang". KALIBRASI per pemasangan.
+SIZE_RULE = "luas"
+LEN_KECIL_TANGGUNG = 817
+LEN_TANGGUNG_BESAR = 1060
+AREA_BESAR_PASTI = 360_000

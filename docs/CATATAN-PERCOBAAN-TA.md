@@ -241,6 +241,37 @@ Aplikasi `app/` (`python -m app --backend pytorch --cam 1 --plc`), profil nano (
 - Ukuran: botol 400 ml ramping (#17) terbaca "kecil" (luas kotak kecil) → batas berbasis luas lemah untuk botol ramping; pertimbangkan panjang botol.
 - Kesimpulan: stop-and-scan dijadikan mode default aplikasi (`app/config.py` STOP_SCAN, `--terus` untuk mematikan, `--jeda` detik). Kelemahan tersisa = warna pucat & botol berlabel penuh (latih ulang dengan sesi 22 Okt + frame scan).
 
+### L-18 Latih ulang malam 22→23 Okt: cairan RN dan detektor ver10
+**Cairan (`scripts/pipeline_cairan/s31_data_22okt.py`, `s32_cv_rn.py`).** Data baru: V22 (sesi capture 22 Okt, 5 botol berlabel penuh; air bening berisi dibuang, Mizone kosong dipakai) + S22 (90 frame diam aplikasi, label user) = 128 potongan, 18 kelompok botol fisik. CV 5 fold per kelompok (31 kelompok, 325 foto), RH (data lama) vs RN (+ data 22 Okt), resep sama:
+
+| salah (ambang 0,5) | RH | RN | rata-rata RH+RN |
+|---|---|---|---|
+| total 325 foto | 45 | 42 | **40** |
+| data lama 16/20 Okt | 15 | 10 | 10 |
+| V22 berlabel penuh (AUC) | 0,59 | **0,94** | 0,80 |
+| S22 frame belt | 0 | 9 | 3 |
+
+Temuan: (1) **ketidakstabilan pada warna pucat** — Fanta isi oren pucat: model RH final (aktif) luput di uji live, model RH dari fold CV mendeteksi 9/9, RN luput 9/9 → kasusnya di batas keputusan, bergantung variasi latih; (2) gabungan RH+RN paling stabil (40 salah); (3) **botol KOSONG berlabel penuh** (Minute Maid, Mizone) tetap salah di semua resep (0/8); Isoplus kosong membaik 1/8 → 7/8 dengan RN. Keputusan: model aktif tetap RH; `cairan_RN.pt` + opsi gabungan (`rvm_kp/config.py` LIQUID_EXTRA, mati) diuji di sesi pembuktian.
+
+**Detektor botol ver10 (`scripts/pipeline_botol/ver10_nyata.py`).** Resep ver9c + foto NYATA 22 Okt: 79 non-botol (plastik kresek 37, tangan 9, foto botol di HP 8, tisu 6, HP 5, dll.) sebagai gambar tanpa botol (×5) + 154 botol hari yang sama (×2; kotak dari ver9c). CV 5 fold per BENDA (kresek dibagi 6 kantong):
+
+| | ver9c | **ver10** |
+|---|---|---|
+| non-botol nyata diterima (79) | 29 | **0** |
+| plastik kresek (37) | 26 | **0** |
+| botol terdeteksi (154) | 154 | **154** |
+
+Regresi model final: TACO tempel 8,8% → 7,9%; TrashNet non-botol 7% → 5% (kaca 16 → 10/108), PET TrashNet 33 → 30/44; botol tempelan studio/belt 94%/97%; sesi 20 Okt 117/117; old_test sama; kotak vs ver9c IoU median 0,976, keputusan tutup & cairan identik 167/167. Keterbatasan: negatif & positif uji dari SATU sesi (22 Okt) → perlu sesi pembuktian di hari lain dengan benda baru (`docs/DAFTAR-POTRET-SESI-PEMBUKTIAN.md`). Kandidat: `3_model_final/botol_ver10_kandidat.pt` (+ ONNX/OpenVINO `ekspor/botol_ver10*`).
+
+### L-19 Kenapa data luar tidak membantu (analisis 23 Okt, usul user)
+- Model cairan memakai potongan kotak botol (bukan foto utuh), tetapi **botol PET tembus pandang**: latar (belt / meja putih) terlihat MELALUI botol → sumber foto tetap terbaca dari dalam kotak. Menghapus latar otomatis (rembg) **menghapus badan botol bening** (hanya tutup/label tersisa) → tidak dapat dipakai.
+- Saringan kualitas Open Food Facts (botol utuh, tajam, berbentuk botol): hanya 92/1577 lolos (1271 menempel tepi foto: foto produk dibingkai mepet).
+- **Label 'kosong' Open Food Facts = botol PENUH air bening**, bukan kosong; foto produk hampir tidak pernah botol kosong. Pelabelan ulang visual (Claude, menunggu validasi user): 34 berwarna, 40 air bening penuh, 18 buang, **0 kosong**. Data luar praktis hanya membawa satu kelas → jalan pintas sumber. Percobaan T0/T1/T2 (`s33_luar_ketat.py`) menunggu validasi label.
+- Pelajaran: data luar membantu hanya bila membawa positif DAN negatif dari sumber yang sama (TrashNet untuk detektor botol), atau berupa variasi data kita sendiri (geser warna RH).
+
+### L-20 Ukuran dari panjang botol (23 Okt, `scripts/alat/analisis_ukuran.py`)
+26 botol ber-ml (13/16/20 Okt), uji tinggalkan-satu-botol: luas kotak 22/26 (salah: Pristine 400, Powerade 400, Isoplus 350, Sprite 250), **panjang 24/26** (salah: Cleo galon 1000 gemuk, Sprite Nipis Mint "250" — kemungkinan label ml salah, panjangnya sama dengan botol 390 ml), lebar 20/26, volume semu 21/26. Aturan panjang + "luas ≥ 360k = besar" (menutup galon gemuk) tersedia di `rvm_kp` (`SIZE_RULE = "panjang"`, bawaan masih "luas"). Kalibrasi tetap per pemasangan.
+
 ### L-9 Model final
 `datasets/4_eksperimen/cairan/final/` (belt W16 + C13) dan `final2/` (+ pilot dan 28 foto tambahan). Keduanya tidak punya uji bersih; akurasi = hasil CV di atas. Belum dipasang di server (lingkup Capstone 1).
 

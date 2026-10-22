@@ -91,6 +91,10 @@ class RVMAnalyzer:
         self.bottle = YOLO(m["bottle"], task="detect")
         self.cap = YOLO(m["cap_roi"] if self.cap_mode == "roi" else m["cap"], task="detect")
         self.liquid = YOLO(m["liquid"], task="classify")
+        # Gabungan model cairan (opsional, config.LIQUID_EXTRA): skor = rata-rata semua model. Mati bila None.
+        extra = m.get("liquid_extra", getattr(config, "LIQUID_EXTRA", None) if models is None else None)
+        self.liquid_extra = [YOLO(x, task="classify") for x in ([extra] if isinstance(extra, str) else (extra or []))]
+        self._cbx = [None] * len(self.liquid_extra)
         self.liquid_thr, self.device = liquid_thr, device
         self._cb = None
         self.last_timings = {}
@@ -147,11 +151,27 @@ class RVMAnalyzer:
             pl = self._pred(self.liquid, fold_crop(frame, x1, y1, x2, y2), config.IMGSZ_LIQUID)
             if self._cb is None:
                 self._cb = [i for i, v in pl.names.items() if v == "berwarna"][0]
-            p = float(pl.probs.data[self._cb]); T["cairan"] += (time.perf_counter() - t) * 1e3
+            p = float(pl.probs.data[self._cb])
+            if self.liquid_extra:
+                fc = fold_crop(frame, x1, y1, x2, y2); ps = [p]
+                for j, mx in enumerate(self.liquid_extra):
+                    px = self._pred(mx, fc, config.IMGSZ_LIQUID)
+                    if self._cbx[j] is None:
+                        self._cbx[j] = [i for i, v in px.names.items() if v == "berwarna"][0]
+                    ps.append(float(px.probs.data[self._cbx[j]]))
+                p = sum(ps) / len(ps)
+            T["cairan"] += (time.perf_counter() - t) * 1e3
 
             clipped = x1 < 4 or x2 > W - 4
             area = (x2 - x1) * (y2 - y1) * (1920 / W) ** 2
-            size = "?" if clipped else ("kecil" if area < config.AREA_KECIL_TANGGUNG else ("tanggung" if area < config.AREA_TANGGUNG_BESAR else "besar"))
+            length = max(x2 - x1, y2 - y1) * (1920 / W)
+            if clipped:
+                size = "?"
+            elif getattr(config, "SIZE_RULE", "luas") == "panjang":
+                size = ("besar" if length >= config.LEN_TANGGUNG_BESAR or area >= config.AREA_BESAR_PASTI else
+                        ("tanggung" if length >= config.LEN_KECIL_TANGGUNG else "kecil"))
+            else:
+                size = "kecil" if area < config.AREA_KECIL_TANGGUNG else ("tanggung" if area < config.AREA_TANGGUNG_BESAR else "besar")
             out.append(BottleResult((x1 / k, y1 / k, x2 / k, y2 / k), float(b.conf), cap, cconf, p, p >= self.liquid_thr, size, area))
         T["total"] = sum(T.values())
         for r in out:
