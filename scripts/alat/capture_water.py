@@ -236,7 +236,10 @@ def finish_edit():
     edit = None
     if mode == "new":
         brands[bottle] = (brand, liquid)
-        bottle += 1
+        # nomor botol baru = setelah nomor TERTINGGI yang pernah dipakai (bukan bottle+1): setelah 'v' (balik), bottle+1 bisa
+        # bertabrakan dgn botol lama -> kondisi yg dulu dilewati/difoto ikut terbawa (bug 22 Okt: Nutriboost "auto skip")
+        used = {int(r[1]) for r in rows if r[1].isdigit() and r[1] != "0"} | set(brands)
+        bottle = max(used | {bottle}) + 1
         brand, liquid = nm, lq
         goto_next_step()
         msg = f"botol {bottle:02d} dimulai. {step_text()}"

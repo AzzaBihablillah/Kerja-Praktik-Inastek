@@ -8,7 +8,7 @@ import os
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODELS = os.path.join(REPO, "datasets", "3_model_final")
 BOTTLE_PT = os.path.join(MODELS, "botol_ver8b.pt")              # sejak 21 Okt: ver8b (ver7 luput pada botol berisi)
-CAP_PT = os.path.join(MODELS, "cap_belt_final.pt")
+CAP_PT = os.path.join(MODELS, "cap_belt_v2.pt")   # 22 Okt: v2 (tutup hitam & sesi 16/20 Okt); dulu cap_belt_final
 CAP_NAMES = ["on", "off"]          # kelas 0 = cap (tutup terpasang), 1 = no_cap (lepas)
 
 _models = {}
