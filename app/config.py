@@ -49,7 +49,9 @@ SCAN_SAVE_DIR = os.path.join(REPO, "datasets", "1_foto_mentah", "{tanggal}_scan_
 # Hanya backend pytorch (berkas .pt kandidat). Menambah waktu berhenti (~2x analisis).
 SHADOW = False
 _M = os.path.join(REPO, "datasets", "3_model_final")
-KANDIDAT = dict(bottle=os.path.join(_M, "botol_ver10_kandidat.pt"), liquid=os.path.join(_M, "cairan_berisi_kandidat.pt"), size_rule="panjang")
+KANDIDAT = dict(bottle=os.path.join(_M, "botol_ver10_kandidat.pt"), liquid=os.path.join(_M, "cairan_berisi_kandidat.pt"), size_rule="panjang",
+                # merek (24 Okt): coca_cola vs non_coca_cola, resep A (foto belt saja), dinilai pada kotak botol model AKTIF; bonus tetap 0
+                brand=os.path.join(_M, "merek_coca_kandidat.pt"))
 
 # ---- sesi ----
 IDLE_TIMEOUT = 30            # detik tanpa botol terlihat -> sesi berakhir (sama dengan alur mesin)

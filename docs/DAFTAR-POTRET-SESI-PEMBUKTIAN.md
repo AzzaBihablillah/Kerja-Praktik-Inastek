@@ -2,17 +2,17 @@
 
 **Tujuan:** membuktikan di HARI LAIN dengan BENDA BARU bahwa perbaikan 22–23 Okt bertahan (bukan hanya cocok dengan sesi 22 Okt), dan mengumpulkan data kelemahan yang tersisa. Hasil sesi ini = angka uji yang sah untuk TA.
 
-Model yang diuji (belum aktif sampai sesi ini lolos): detektor `botol_ver10` (CV per benda 22 Okt: non-botol 0/79, botol 154/154), cairan `cairan_berisi_kandidat` (definisi baru: air bening juga ditolak) dibanding RH, ukuran berbasis panjang.
+Model yang diuji (belum aktif sampai sesi ini lolos): detektor `botol_ver10` (CV per benda 22 Okt: non-botol 0/79, botol 154/154), cairan `cairan_berisi_kandidat` (definisi baru: air bening juga ditolak) dibanding RH, ukuran berbasis panjang, dan **merek** `merek_coca_kandidat` (coca_cola vs non_coca_cola, resep A; tambah 24 Okt — sesi ini = uji terpisah pertama model merek dengan botol baru di hari lain).
 
 ## Cara (semua lewat aplikasi kiosk, mode berhenti-lalu-pindai, frame diam otomatis tersimpan)
 1. Pastikan area belt aman, lalu minta Claude menjalankan aplikasi:
    `venv/Scripts/python.exe -m app --backend pytorch --cam 1 --plc --jeda 1.0 --kandidat`
-   Layar & poin = model AKTIF (ver9c, cap_belt_v2, cairan_RH, ukuran luas). `--kandidat` = model kandidat (ver10, cairan_berisi, ukuran panjang)
+   Layar & poin = model AKTIF (ver9c, cap_belt_v2, cairan_RH, ukuran luas). `--kandidat` = model kandidat (ver10, cairan_berisi, ukuran panjang, merek coca_cola)
    ikut menilai FRAME DIAM YANG SAMA dan dicatat ke `SCAN_KANDIDAT.csv` → satu sesi langsung jadi perbandingan, tidak perlu mengulang botol.
    (Diuji offline 23 Okt dengan kamera & PLC tiruan; PLC kini sambung ulang sekali bila putus.)
-2. Masukkan benda satu per satu sesuai daftar; **catat urutan di HP** (mis. "1 kresek hitam, 2 Aqua kosong, ...").
+2. Masukkan benda satu per satu sesuai daftar; **catat urutan DAN nama produk di HP** (mis. "1 kresek hitam, 2 Aqua kosong, 3 Sprite kosong, ..."). Nama produk dipakai menilai model merek pada SEMUA botol sesi, bukan hanya bagian G.
 3. Selesai → Claude membuat `LEMBAR-CEK.jpg` (`scripts/alat/lembar_cek.py`) → kamu sebut nomor yang salah (±5 menit).
-4. Lembar cek (`scripts/alat/lembar_cek.py`) menampilkan keputusan model aktif DAN kandidat per botol; label kamu dipakai untuk menilai keduanya.
+4. Lembar cek (`scripts/alat/lembar_cek.py`) menampilkan keputusan model aktif DAN kandidat per botol, plus baris MEREK (Coca-Cola Co. / bukan, p); label kamu dipakai untuk menilai keduanya.
 
 ## Daftar (±60 benda/pindaian, ±45 menit)
 | bagian | isi | jumlah | catatan |

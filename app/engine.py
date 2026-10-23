@@ -50,7 +50,7 @@ class Machine:
         self.jpeg = b""
         self._stop = threading.Event()
         self._last_stamp = ""
-        self.an2 = None
+        self.an2 = None; self.brand2 = None
         self.session = None                 # dict saat sesi aktif
         self.last_summary = None
         self._t = threading.Thread(target=self._run, name="rvm-engine", daemon=True)
@@ -89,6 +89,10 @@ class Machine:
                     ms = dict(rc.MODEL_SETS["pytorch"], bottle=config.KANDIDAT["bottle"], liquid=config.KANDIDAT["liquid"])
                     self.an2 = RVMAnalyzer("pytorch", models=ms, profile=self.profile, size_rule=config.KANDIDAT["size_rule"])
                     print("[kandidat] aktif (bayangan):", os.path.basename(ms["bottle"]), os.path.basename(ms["liquid"]), "ukuran", config.KANDIDAT["size_rule"])
+                    if config.KANDIDAT.get("brand") and os.path.exists(config.KANDIDAT["brand"]):
+                        from rvm_kp.merek import Merek
+                        self.brand2 = Merek(config.KANDIDAT["brand"])
+                        print("[kandidat] merek (bayangan):", os.path.basename(config.KANDIDAT["brand"]))
         from rvm_kp.kamera import Kamera
         self.src = Kamera(self.cam_index, config.CAMERA_W, config.CAMERA_H)
 
@@ -231,6 +235,12 @@ class Machine:
                 pass
             tt = _T(); tt.id = t.id; tt.votes = [(r.cap, r.cap_conf, r.p_liquid, r.size, r.area_1920) for r in vv]
             k = decide(tt, self.liquid_thr) if vv else dict(decision="tidak_terdeteksi", reason="", p_liquid="", size="")
+            pc = ""                                       # merek: kotak botol model AKTIF (seperti data latih: ver9c), rata-rata frame diam
+            if self.brand2 is not None:
+                try:
+                    pc = round(self.brand2.p_coca(frames, t.box), 3)
+                except Exception as e:
+                    print("[kandidat] merek gagal:", e)
             if not config.SCAN_SAVE_DIR:
                 return
             d = config.SCAN_SAVE_DIR.replace("{tanggal}", datetime.date.today().isoformat()); os.makedirs(d, exist_ok=True)
@@ -239,9 +249,10 @@ class Machine:
                 w = csv.writer(fh)
                 if new:
                     w.writerow(["waktu", "sesi", "botol", "keputusan_kandidat", "alasan_kandidat", "p_cairan_kandidat", "p_per_frame",
-                                "ukuran_kandidat", "plc_berhenti_ok"])
+                                "ukuran_kandidat", "plc_berhenti_ok", "p_coca_kandidat", "merek_kandidat"])
                 w.writerow([self._last_stamp, self.session["id"] if self.session else 0, t.id, k["decision"], k.get("reason") or "",
-                            k["p_liquid"], " ".join("%.2f" % r.p_liquid for r in vv), k["size"], plc_ok])
+                            k["p_liquid"], " ".join("%.2f" % r.p_liquid for r in vv), k["size"], plc_ok, pc,
+                            "" if pc == "" else ("coca_cola" if pc >= self.brand2.thr else "non_coca_cola")])
         except Exception as e:
             print("[kandidat] gagal:", e)
 

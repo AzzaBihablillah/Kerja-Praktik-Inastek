@@ -9,21 +9,12 @@ import csv, json, math, os, shutil, sys
 from collections import defaultdict
 import cv2, numpy as np
 
-ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "datasets")
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, REPO)
+ROOT = os.path.join(REPO, "datasets")
 OUT = f"{ROOT}/4_eksperimen/merek"; CR = f"{OUT}/crops"; S = 256
 LABEL_USER = {"botol_17_tak_dikenal": "B"}                    # validasi user 23 Okt (lainnya = usulan, semua ACC)
-
-
-def brand_crop(im, x1, y1, x2, y2, pad=0.04, size=S):
-    H, W = im.shape[:2]; w, h = x2 - x1, y2 - y1
-    x1, x2 = max(0, int(x1 - pad * w)), min(W, int(x2 + pad * w)); y1, y2 = max(0, int(y1 - pad * h)), min(H, int(y2 + pad * h))
-    c = im[y1:y2, x1:x2]
-    if c.shape[0] > c.shape[1]:
-        c = cv2.rotate(c, cv2.ROTATE_90_CLOCKWISE)
-    s = size / max(c.shape[:2]); c = cv2.resize(c, (max(1, round(c.shape[1] * s)), max(1, round(c.shape[0] * s))), interpolation=cv2.INTER_AREA)
-    out = np.full((size, size, 3), 114, np.uint8); oy, ox = (size - c.shape[0]) // 2, (size - c.shape[1]) // 2
-    out[oy:oy + c.shape[0], ox:ox + c.shape[1]] = c
-    return out
+from rvm_kp.merek import brand_crop                  # satu sumber: dipakai juga oleh app/ (kandidat) dan Jetson
 
 
 def rows():
@@ -66,8 +57,9 @@ def folds(R, key, K=5):
 def train(items, d, project, name, epochs=30, cache=False):
     from ultralytics import YOLO
     shutil.rmtree(d, ignore_errors=True)
-    n = {c: sum(l == c for _, l, _ in items) for c in ("mitra", "bukan")}; big = max(n.values())
-    for c in ("mitra", "bukan"):
+    cls = sorted({l for _, l, _ in items})               # mitra/bukan (CV) atau coca_cola/non_coca_cola (model final)
+    n = {c: sum(l == c for _, l, _ in items) for c in cls}; big = max(n.values())
+    for c in cls:
         os.makedirs(f"{d}/train/{c}"); os.makedirs(f"{d}/val/{c}")
         for p, l, i in items:
             if l == c:

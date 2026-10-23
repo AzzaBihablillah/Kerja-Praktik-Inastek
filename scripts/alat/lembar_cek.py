@@ -1,6 +1,7 @@
 """Lembar cek bernomor dari frame diam aplikasi kiosk (stop-and-scan), untuk dilabeli user dari HP dalam beberapa menit.
   python scripts/alat/lembar_cek.py --dir 1_foto_mentah/2026-10-23_scan_app [--sesi 14 15]
-Tiap botol: potongan frame diam pertama + keputusan mesin (hijau terima / merah tolak), skor cairan, ukuran.
+Tiap botol: potongan frame diam pertama + keputusan mesin (hijau terima / merah tolak), skor cairan, ukuran
+(+ baris KANDIDAT dan MEREK bila app dijalankan dengan --kandidat).
 Keluaran: <dir>/LEMBAR-CEK.jpg (dan LEMBAR-CEK-2.jpg dst. bila > 32 botol). Label user ditulis ke kolom label_manual SCAN.csv
 (oleh Claude, dari jawaban chat "#9 air bening, #13 kosong"; nomor = urutan baris SCAN.csv yang tampil)."""
 import argparse, csv, os, sys
@@ -32,7 +33,8 @@ for i, r in enumerate(R, 1):
         x1, y1, x2, y2 = [int(v) for v in max(bb, key=lambda z: (z[2] - z[0]) * (z[3] - z[1]))]; m = 30
         im = im[max(0, y1 - m):y2 + m, max(0, x1 - m):x2 + m]
     im = cv2.resize(im, (420, int(420 * im.shape[0] / im.shape[1])))
-    top = 76 if KD else 52
+    MK = any(k.get("p_coca_kandidat") for k in KD.values())   # kolom merek kandidat (sejak 24 Okt)
+    top = (98 if MK else 76) if KD else 52
     im = cv2.copyMakeBorder(im, top, max(0, 170 - im.shape[0]), 0, 0, cv2.BORDER_CONSTANT)[:170 + top]
     col = (60, 200, 60) if r["keputusan"] == "terima" else (60, 60, 230)
     cv2.rectangle(im, (0, 0), (420, 50), col, -1)
@@ -43,6 +45,11 @@ for i, r in enumerate(R, 1):
         txt = ("KANDIDAT: " + ("DITERIMA" if k["keputusan_kandidat"] == "terima" else AL.get(k["alasan_kandidat"], k["keputusan_kandidat"])) +
                f"  {k['p_cairan_kandidat']}  {k['ukuran_kandidat']}") if k else "KANDIDAT: -"
         cv2.rectangle(im, (0, 52), (420, 74), (40, 40, 40), -1); cv2.putText(im, txt[:52], (6, 68), 0, 0.5, (0, 255, 255), 1)
+        if MK:
+            pc = k.get("p_coca_kandidat") if k else ""
+            mt = ("MEREK: " + ("COCA-COLA CO." if float(pc) >= 0.5 else "bukan Coca-Cola") + f"  p={float(pc):.2f}") if pc else "MEREK: -"
+            cv2.rectangle(im, (0, 75), (420, 96), (40, 40, 40), -1)
+            cv2.putText(im, mt, (6, 91), 0, 0.5, (0, 0, 255) if pc and float(pc) >= 0.5 else (200, 200, 200), 1)
     tiles.append(im)
 for s in range(0, len(tiles), 32):
     ch = tiles[s:s + 32]
