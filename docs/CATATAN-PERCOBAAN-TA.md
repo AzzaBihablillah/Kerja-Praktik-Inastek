@@ -339,6 +339,7 @@ Peta lengkap dengan proporsi per model: `PETA-DATASET-19-OKT.md`. Temuan utama: 
 6. Klaim "cola gelap adalah target utama deteksi cairan" dilebih-lebihkan.
 7. Bug pengunduhan TACO: file 0 byte dari `open(..., 'wb')` sebelum `urlopen`; dihapus dan diunduh ulang.
 8. Data warisan dan data luar semula diharapkan membantu; hasilnya memperburuk (L-7), dan tercatat apa adanya.
+9. **(23 Okt, ditemukan bersama user)** Percobaan data luar Open Food Facts (s14, L-7) memakai label OTOMATIS dari kategori produk tanpa audit manusia: label 'kosong' ternyata = botol PENUH air bening, ada pula teh/minuman berwarna berlabel 'kosong'. Sebagian alasan "data luar memperburuk" adalah label yang salah, bukan hanya beda sumber foto. Audit visual 92 potongan bersih oleh user (halaman validasi, 2 putaran tinjau): 14 berwarna, 15 air bening, 4 kosong (semua berlabel/berbahan berwarna), 59 buang. Pelajaran audit: (a) posisi botol menentukan (botol REBAH berisi sebagian = realistis seperti belt; botol BERDIRI berisi sebagian = garis cairan melintang, tidak realistis); (b) botol berbahan plastik berwarna (Mizone, botol teh hijau) — warna dari plastik, bukan cairan; (c) yang ragu dibuang agar tidak bias.
 
 ## 8. Keterbatasan
 - W16 hanya 5 botol, satu sesi, satu pencahayaan, foto statis; Fanta Grape belum ada; pemilahan data warisan belum divalidasi manusia.

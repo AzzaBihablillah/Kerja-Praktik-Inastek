@@ -7,7 +7,7 @@ Saringan kualitas data luar (kotak dari botol_ver9c pada foto asli):
   ketajaman (variansi Laplacian potongan abu) >= 60.
 Potongan KETAT: fold_crop dengan pad 0 (data kita juga dibuat ulang ketat, kotak botol_ver9c).
 CV: fold sama dengan s32 (data kita). Data luar hanya di LATIH, tidak pernah diuji. Resep tanpa geser-hue:
-  T0 = data kita (ketat)        T1 = data kita (ketat) + Open Food Facts bersih (ketat)
+  T0 = data kita (ketat)   T1 = + luar berwarna/kosong (label user 23 Okt)   T2 = T1 + air bening luar sebagai 'kosong' (tidak berwarna)
   python scripts/pipeline_cairan/s33_luar_ketat.py siapkan   -> crops_fold_tight/ + luar_bersih.csv + LEMBAR-LUAR-BERSIH.jpg
   python scripts/pipeline_cairan/s33_luar_ketat.py cv        -> cv_tight.jsonl + cv_tight_report.txt"""
 import csv, json, os, random, shutil, sys
@@ -86,17 +86,20 @@ def siapkan():
 def cv():
     from ultralytics import YOLO
     rows = [r for r in rows_all() if os.path.exists(f"{TD}/{r['id']}.jpg")]; F, load = folds(rows)
-    ext = list(csv.DictReader(open(f"{OUT}/luar_bersih.csv", encoding="utf-8")))
+    # label AKHIR dari validasi user 23 Okt (luar_bersih_relabel.csv kolom label_user): berwarna / kosong / air_bening / buang
+    rel = list(csv.DictReader(open(f"{OUT}/luar_bersih_relabel.csv", encoding="utf-8")))
+    ext1 = [dict(id=r["id"], liquid=r["label_user"]) for r in rel if r["label_user"] in ("berwarna", "kosong")]
+    ext2 = ext1 + [dict(id=r["id"], liquid="kosong") for r in rel if r["label_user"] == "air_bening"]   # air bening = tidak berwarna
     res = f"{OUT}/cv_tight.jsonl"
     done = {(json.loads(l)["fold"], json.loads(l)["resep"]) for l in open(res)} if os.path.exists(res) else set()
     for k in range(5):
         te = [r for r in rows if F[r["kel"]] == k]
-        for rc in ("T0", "T1"):
+        for rc in ("T0", "T1", "T2"):
             if (k, rc) in done:
                 continue
             items = [(f"{TD}/{r['id']}.jpg", r["liquid"], r["id"]) for r in rows if F[r["kel"]] != k]
-            if rc == "T1":
-                items += [(f"{TD}/{e['id']}.jpg", e["liquid"], e["id"]) for e in ext]
+            if rc in ("T1", "T2"):
+                items += [(f"{TD}/{e['id']}.jpg", e["liquid"], e["id"]) for e in (ext1 if rc == "T1" else ext2)]
             pt = train(items, f"{OUT}/tmp_tight/{rc}_{k}", f"{OUT}/runs_tight", f"{rc}_f{k}")
             m = YOLO(pt); cb = [i for i, v in m.names.items() if v == "berwarna"][0]
             ps = [float(p.probs.data[cb]) for p in m.predict([f"{TD}/{r['id']}.jpg" for r in te], imgsz=224, verbose=False)]
@@ -105,11 +108,11 @@ def cv():
                     fh.write(json.dumps(dict(fold=k, resep=rc, id=r["id"], src=r["src"], kel=r["kel"], baru=r["baru"], liquid=r["liquid"], p=round(p, 4))) + "\n")
             print(f"fold {k} {rc}: latih {len(items)}, uji {len(te)}", flush=True)
     R = [json.loads(l) for l in open(res) if l.strip()]
-    L = ["Uji usul user: data luar (Open Food Facts) dengan potongan BAGUS & KETAT. T0 = data kita saja, T1 = + data luar bersih.", ""]
+    L = ["Uji usul user: data luar (Open Food Facts) dengan potongan BAGUS & KETAT. T0 = data kita saja, T1 = + luar (15 berwarna, 4 kosong; label user), T2 = T1 + 16 air bening sebagai tidak berwarna.", ""]
     for name, f in (("SEMUA", lambda r: True), ("data lama 16/20 Okt", lambda r: r["baru"] == 0), ("V22 label penuh", lambda r: r["src"] == "V22"),
                     ("S22 frame belt", lambda r: r["src"] == "S22")):
         L.append(f"== {name}")
-        for rc in ("T0", "T1"):
+        for rc in ("T0", "T1", "T2"):
             rr = [x for x in R if x["resep"] == rc and f(x)]
             pos = [x["p"] for x in rr if x["liquid"] == "berwarna"]; neg = [x["p"] for x in rr if x["liquid"] == "kosong"]
             L.append(f"   {rc}: AUC {auc(pos, neg):.3f} | berisi terdeteksi {sum(p >= .5 for p in pos)}/{len(pos)} | kosong benar {sum(p < .5 for p in neg)}/{len(neg)}")
