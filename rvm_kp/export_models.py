@@ -13,6 +13,7 @@ MODELS = {
     "cap_belt_v2": (f"{M}/cap_belt_v2.pt", IMGSZ_CAP_FULL),
     "cap_belt_v2_roi": (f"{M}/cap_belt_v2.pt", CAP_ROI_IMGSZ),
     "cairan_RH": (f"{M}/cairan_RH.pt", IMGSZ_LIQUID),
+    "merek_coca_kandidat": (f"{M}/merek_coca_kandidat.pt", 256),   # bonus merek coca_cola (kandidat 24 Okt, rvm_kp/merek.py)
 }
 
 

@@ -25,11 +25,12 @@ def line(tag, msg, fix=None):
 
 def main():
     print(f"== Sistem: {platform.system()} {platform.machine()} | Python {platform.python_version()}")
-    jetson = os.path.exists("/etc/nv_tegra_release")
+    dt = "/proc/device-tree/model"                    # di dalam Docker /etc/nv_tegra_release tidak ada, device-tree tetap terbaca
+    jetson = os.path.exists("/etc/nv_tegra_release") or (os.path.exists(dt) and "jetson" in open(dt).read().lower())
     if jetson:
-        rel = open("/etc/nv_tegra_release").readline().strip()
+        rel = open("/etc/nv_tegra_release").readline().strip() if os.path.exists("/etc/nv_tegra_release") else "(di dalam Docker: versi L4T lihat di host)"
         line(OK, f"Jetson terdeteksi: {rel}")
-        model = sh("tr -d '\\0' < /proc/device-tree/model")
+        model = sh("tr -d '\\0' < /proc/device-tree/model 2>/dev/null || tr -d '\\0' < /etc/rvm_board_model")   # kedua: di Docker
         line(OK, f"Board: {model or '?'}")
         if "R32" in rel:
             line(OK, "L4T R32 = JetPack 4.x (Jetson Nano: versi terakhir 4.6.x)")

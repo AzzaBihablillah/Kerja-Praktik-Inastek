@@ -35,20 +35,23 @@ Di laptop: `venv/Scripts/python.exe -m rvm_kp.buat_paket_nano` → folder `datas
 
 ## 5. Docker Ultralytics untuk JetPack 4
 ```bash
-sudo docker pull ultralytics/ultralytics:latest-jetson-jetpack4
-sudo docker run -it --name rvm --ipc=host --runtime=nvidia --network host \
-  --device /dev/video0 -v ~/rvm:/rvm -w /rvm ultralytics/ultralytics:latest-jetson-jetpack4
-# di dalam container:
-pip install -r rvm_kp/requirements-jetson.txt     # hanya psutil, fastapi, uvicorn, python-snap7
-python -m rvm_kp.cek_perangkat                    # baca bagian "Langkah berikutnya"
+sudo usermod -aG docker jetson                  # sekali (sudah 24 Okt); setelah ini docker tanpa sudo
+docker pull ultralytics/ultralytics:latest-jetson-jetpack4      # 2,5 GB unduhan, 5,6 GB terpasang (24 Okt: Ultralytics 8.4.184, torch 1.11, TRT 8.2.0.6)
+docker run -d --name rvm --ipc=host --runtime=nvidia --network host \
+  -v ~/rvm:/rvm -v /etc/nv_tegra_release:/etc/nv_tegra_release:ro -v /proc/device-tree/model:/etc/rvm_board_model:ro \
+  -w /rvm ultralytics/ultralytics:latest-jetson-jetpack4 sleep infinity        # + --device /dev/video0 bila kamera tercolok
+docker exec -it rvm bash
+# di dalam container — PENTING: `python` = Python 2.7, pakai `python3` (3.8):
+python3 -m pip install -r rvm_kp/requirements-jetson.txt     # psutil sudah ada; fastapi, uvicorn, python-snap7 hanya untuk app/PLC
+python3 -m rvm_kp.cek_perangkat                    # baca bagian "Langkah berikutnya"
 ```
-Masuk lagi nanti: `sudo docker start -ai rvm`. Jangan upgrade torch/numpy/opencv di dalam container.
+Masuk lagi nanti: `docker start rvm && docker exec -it rvm bash`. Jangan upgrade torch/numpy/opencv di dalam container.
 
 ## 6. Buat engine TensorRT FP16 (di Nano, sekali saja)
 ```bash
-python -m rvm_kp.export_models --format engine --half --workspace 1
+python3 -m rvm_kp.export_models --format engine --half --workspace 1
 ```
-±10–20 menit per model (4 model: botol 640, tutup full 640, tutup ROI, cairan 224). Opset ONNX 12 dipakai agar cocok dengan TensorRT 8.2.
+±10–20 menit per model (5 model: botol 640, tutup full 640, tutup ROI, cairan 224, merek 256). Opset ONNX 12 dipakai agar cocok dengan TensorRT 8.2.
 Jika ekspor Ultralytics gagal, cadangan dengan `trtexec` dari ONNX yang ikut paket:
 ```bash
 /usr/src/tensorrt/bin/trtexec --onnx=datasets/3_model_final/ekspor/botol_ver8b.onnx --saveEngine=/tmp/botol.engine --fp16 --workspace=1024
@@ -57,8 +60,8 @@ Jika ekspor Ultralytics gagal, cadangan dengan `trtexec` dari ONNX yang ikut pak
 
 ## 7. Ukur dan uji
 ```bash
-python -m rvm_kp.benchmark --backend tensorrt pytorch --profil nano --n 40   # tensorrt vs pytorch GPU Nano, termasuk kesepakatan keputusan
-python - <<'EOF'
+python3 -m rvm_kp.benchmark --backend tensorrt pytorch --profil nano --n 40   # tensorrt vs pytorch GPU Nano, termasuk kesepakatan keputusan
+python3 - <<'EOF'
 from rvm_kp import RVMAnalyzer
 from rvm_kp.kamera import Kamera
 an = RVMAnalyzer("tensorrt", profile="nano")

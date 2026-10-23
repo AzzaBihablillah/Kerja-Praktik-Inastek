@@ -25,7 +25,9 @@ class Merek(object):
     def __init__(self, path, thr=0.5):
         from ultralytics import YOLO
         self.m = YOLO(path, task="classify"); self.thr = thr
-        self.ci = [i for i, n in self.m.names.items() if n == "coca_cola"][0]
+        # .engine/.onnx: nama kelas baru tersedia setelah prediksi pertama -> pemanasan sekali, nama dibaca dari hasilnya
+        names = self.m.predict(np.full((S, S, 3), 114, np.uint8), imgsz=S, verbose=False)[0].names
+        self.ci = [i for i, n in names.items() if n == "coca_cola"][0]
 
     def p_coca(self, frames, box):
         crops = [brand_crop(f, *box) for f in frames]
