@@ -270,7 +270,7 @@ Regresi model final: TACO tempel 8,8% → 7,9%; TrashNet non-botol 7% → 5% (ka
 - Pelajaran: data luar membantu hanya bila membawa positif DAN negatif dari sumber yang sama (TrashNet untuk detektor botol), atau berupa variasi data kita sendiri (geser warna RH).
 
 ### L-20 Ukuran dari panjang botol (23 Okt, `scripts/alat/analisis_ukuran.py`)
-26 botol ber-ml (13/16/20 Okt), uji tinggalkan-satu-botol: luas kotak 22/26 (salah: Pristine 400, Powerade 400, Isoplus 350, Sprite 250), **panjang 24/26** (salah: Cleo galon 1000 gemuk, Sprite Nipis Mint "250" — kemungkinan label ml salah, panjangnya sama dengan botol 390 ml), lebar 20/26, volume semu 21/26. Aturan panjang + "luas ≥ 360k = besar" (menutup galon gemuk) tersedia di `rvm_kp` (`SIZE_RULE = "panjang"`, bawaan masih "luas"). Kalibrasi tetap per pemasangan.
+26 botol ber-ml (13/16/20 Okt), uji tinggalkan-satu-botol, setelah koreksi user (Sprite Nipis Mint 16 Okt = 390 ml, bukan 250): luas kotak 24/26 (salah: Pristine 400, Isoplus 350), **panjang 25/26** (salah: Cleo galon 1000 yang pendek-gemuk; ditutup aturan luas ≥ 360k = besar), lebar 20/26. Aturan panjang + "luas ≥ 360k = besar" (menutup galon gemuk) tersedia di `rvm_kp` (`SIZE_RULE = "panjang"`, bawaan masih "luas"). Kalibrasi tetap per pemasangan.
 
 ### L-9 Model final
 `datasets/4_eksperimen/cairan/final/` (belt W16 + C13) dan `final2/` (+ pilot dan 28 foto tambahan). Keduanya tidak punya uji bersih; akurasi = hasil CV di atas. Belum dipasang di server (lingkup Capstone 1).

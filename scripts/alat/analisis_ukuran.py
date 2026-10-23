@@ -11,6 +11,8 @@ from ultralytics import YOLO
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DS = os.path.join(REPO, "datasets"); OUT = os.path.join(DS, "4_eksperimen", "ukuran"); os.makedirs(OUT, exist_ok=True)
 SESI = ["2026-10-13_conveyor_v1", "2026-10-16_water_v1", "2026-10-20_water_v1"]
+# Koreksi ml dari user (23 Okt): nama file 16 Okt b01 "sprite-nipis-mint-250" sebenarnya botol 390 ml.
+ML_KOREKSI = {("10-16", "b01"): 390}
 
 
 def kategori(ml):
@@ -38,6 +40,7 @@ def main():
             if x1 < 4 or x2 > W - 4:
                 continue
             w, h = (x2 - x1) * k, (y2 - y1) * k
+            ml = ML_KOREKSI.get((s[5:10], n.split("_")[0]), ml)
             per[(s[5:10], n.split("_")[0], n.split("_")[1], ml)].append((w * h, max(w, h), min(w, h)))
     rows = [dict(sesi=key[0], botol=key[1], nama=key[2], ml=key[3], kat=kategori(key[3]),
                  luas=float(np.median([v[0] for v in vs])), panjang=float(np.median([v[1] for v in vs])),
