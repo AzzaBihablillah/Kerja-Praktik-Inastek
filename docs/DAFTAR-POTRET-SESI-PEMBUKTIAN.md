@@ -24,5 +24,23 @@ Model yang diuji (belum aktif sampai sesi ini lolos): detektor `botol_ver10` (CV
 | E. Ukuran | botol ramping 400 ml, 1–1,5 L, galon kecil, 250–330 ml (tulis ml-nya) | 5 | uji aturan ukuran panjang vs luas |
 | F. **Air bening (WAJIB, keputusan 23 Okt: ditolak)** | botol berisi air bening **TANPA tutup**, merek lain dari sebelumnya (Aqua, Club, Vit, Le Minerale besar, botol soda isi air), penuh & setengah | 10 | uji kandidat `cairan_berisi`; lingkup baru perlu dikabarkan ke mitra |
 
+| G. **Merek: botol fisik produk Coca-Cola Company (tambahan 23 Okt)** | botol BEDA (bukan botol yang sama difoto ulang) per produk, kosong tanpa tutup; label menghadap atas, sebagian juga label menyamping | ±25 botol | lihat tabel di bawah |
+
+### G. Target botol fisik merek (hasil uji model merek 23 Okt)
+Model merek gagal pada produk yang botol fisiknya sedikit (data internet tidak membantu, CATATAN §5). Target ≥5 botol fisik berbeda per produk:
+
+| produk | botol fisik sekarang | tambah | prioritas |
+|---|---|---|---|
+| Minute Maid Nutriboost | 1 (model 0/16) | 4 | **utama** |
+| Powerade | 2 (model 8–11/20) | 3 | **utama** |
+| Sprite (termasuk Nipis Mint) | 3 | 2–3 | **utama** |
+| Frestea | 3 | 2 | **utama** |
+| Coca-Cola biasa | 2 | 3 | sedang |
+| Minute Maid (Pulpy, dll.) | 2 | 3 | sedang |
+| Fanta / Coca-Cola Zero | 4 | 1 (bila ada) | rendah |
+| produk Coca-Cola Company lain yang ada di toko (Ades, Fuze Tea, Schweppes, dll.) | 0 | 1–2 per produk | bonus |
+
+Tulis nama produk di catatan HP. Pembanding non-Coca-Cola yang mirip dan sering salah diterima: **Sunbay, Pristine, Big Cola/Big Nipis Madu, Mizone, Superindo**. Masing-masing 1–2 botol beda bila ada.
+
 ## Setelah sesi
 Claude: hitung per bagian (diterima/ditolak benar), bandingkan dengan model lama, catat di `CATATAN-PERCOBAAN-TA.md`, lalu (bila lolos) usulkan mengaktifkan `ver10` / gabungan cairan / ukuran panjang. Frame berlabel juga jadi data latih berikutnya.
