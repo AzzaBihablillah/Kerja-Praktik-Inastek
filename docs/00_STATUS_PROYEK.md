@@ -13,6 +13,7 @@ Rincian percobaan dan angka: `docs/CATATAN-PERCOBAAN-TA.md`. Riwayat dan keputus
   5. **merek** sebagai bonus poin.
 - **Tujuan mitra:** kamera **menggantikan load cell**; sistem tidak boleh bergantung pada load cell.
 - **Lingkup deteksi cairan:** hanya **cairan berwarna**. **Air bening di luar lingkup** (disepakati dengan mitra 16 Okt); ditulis sebagai keterbatasan, bukan pekerjaan. Jangan mengusulkan percobaan air bening.
+- **Usulan perubahan lingkup (user, 23 Okt):** botol berisi **air bening juga ditolak** (definisi 'berisi apa pun' vs 'kosong'), dipicu temuan uji live (air bening di botol air mineral terdeteksi 5/5). Sedang diuji: `scripts/pipeline_cairan/s34_berisi_bening.py`. **Perlu dikabarkan ke mitra** sebagai tambahan; di TA ditulis sebagai temuan, bukan janji.
 - **Penerimaan:** semua botol PET diterima. Merek hanya bonus: whitelist Coca-Cola, Fanta, Sprite (termasuk Nipis Mint); lainnya poin default.
 - **Ukuran (keputusan user):** kecil ≤ 350 ml, tanggung 351–800 ml (botol ritel 390 ml = tanggung), besar > 800 ml.
 - **Target perangkat:** **Jetson Nano Developer Kit B01, 4 GB** (dipastikan 21 Okt dari label P3450 / 180-13449-DAAF-B01 / 945-13450-0000-100): JetPack 4.6.x maksimal (Ubuntu 18.04, Python 3.6, CUDA 10.2, TensorRT 8.2), GPU Maxwell 128 core, FP16 (tanpa INT8). Ultralytics modern hanya lewat Docker JetPack 4. Daya wajib barrel 5V 4A + jumper J48. Jika Jetson tidak bisa dipakai, sistem dijalankan di laptop (RTX 4050) dengan kode yang sama; angka kecepatan dilaporkan sesuai perangkat yang benar-benar diuji.
