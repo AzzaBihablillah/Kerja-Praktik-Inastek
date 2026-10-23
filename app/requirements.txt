@@ -1,0 +1,6 @@
+# Tambahan untuk aplikasi kiosk (di atas rvm_kp/requirements-laptop.txt atau rvm_kp/requirements-jetson.txt).
+# Semua ringan dan murni Python; jalan di Python 3.8 (Docker JetPack 4 di Jetson Nano). Tidak ada build step Node.
+fastapi>=0.100,<0.116     # rentang ini masih mendukung Python 3.8 (laptop Python 3.13 boleh versi lebih baru)
+uvicorn>=0.22,<0.34
+segno>=1.5,<2             # pembuat QR klaim (murni Python, tanpa Pillow)
+# python-snap7            # hanya bila --plc dipakai (lihat rvm_kp/JETSON-NANO.md bagian PLC)

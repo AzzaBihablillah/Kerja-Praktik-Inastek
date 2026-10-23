@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Operator RVM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Geist:wght@400..700&family=Geist+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<style>
+  body { padding: 20px clamp(16px, 3vw, 36px) 40px; }
+  .head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .head h1 { font-size: 28px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .panel { background: #fbf8f0; border-radius: var(--r-md); box-shadow: 0 0 0 1px var(--line) inset; padding: 16px 18px; }
+  .panel h2 { font-size: 17px; letter-spacing: -.01em; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0; }
+  .kv div { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); }
+  .kv dt { font-size: 12px; color: var(--muted); }
+  .kv dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; word-break: break-word; }
+  img.prev { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 12px; background: var(--panel); display: block; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 6px 8px; border-bottom: 1.5px solid var(--ink); white-space: nowrap; }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  tr.bad td:nth-child(2) { color: #9a2d12; font-weight: 600; }
+  tr.ok td:nth-child(2) { color: #3d6107; font-weight: 600; }
+  .scroll { overflow-x: auto; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .row .btn { min-height: 42px; font-size: 14px; padding: 0 14px; }
+  .note { font-size: 13px; color: var(--muted); margin-top: 8px; max-width: 70ch; }
+  .stack { display: grid; gap: 20px; }
+  @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="head">
+  <div><p class="eyebrow">Tukar Botol</p><h1>Panel operator</h1></div>
+  <div class="row">
+    <span class="chip" id="st"><span class="dot off"></span>memuat</span>
+    <a class="btn btn-quiet" href="/" target="_blank" rel="noopener">Buka kiosk</a>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="stack">
+    <section class="panel">
+      <h2>Kamera <span class="chip" id="fps">-</span></h2>
+      <img class="prev" id="prev" alt="Pratinjau kamera dengan kotak deteksi">
+      <p class="note">Garis putih = zona periksa. Pratinjau penuh hanya saat sesi berjalan; di luar sesi model tidak dijalankan.</p>
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn-lime" id="bStart" type="button">Mulai sesi</button>
+        <button class="btn" id="bEnd" type="button">Akhiri sesi</button>
+        <span class="err" id="msg" style="color:#9a2d12;font-weight:600"></span>
+      </div>
+    </section>
+    <section class="panel" id="simPanel" hidden>
+      <h2>Simulasi</h2>
+      <div class="row">
+        <button class="btn btn-quiet" data-sim='{"size":"kecil"}' type="button">Kecil kosong</button>
+        <button class="btn btn-quiet" data-sim='{"size":"tanggung"}' type="button">Tanggung kosong</button>
+        <button class="btn btn-quiet" data-sim='{"size":"besar"}' type="button">Besar kosong</button>
+        <button class="btn btn-quiet" data-sim='{"size":"tanggung","cap":true}' type="button">Bertutup</button>
+        <button class="btn btn-quiet" data-sim='{"size":"besar","liquid":true}' type="button">Berisi cairan</button>
+        <button class="btn btn-ghost" id="bAuto" type="button">Otomatis</button>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Mesin</h2>
+      <dl class="kv" id="kv"></dl>
+    </section>
+  </div>
+  <div class="stack">
+    <section class="panel">
+      <h2>Botol terakhir <span class="chip">data kalibrasi</span></h2>
+      <div class="scroll"><table>
+        <thead><tr><th>#</th><th>keputusan</th><th>ukuran</th><th>area_1920</th><th>p_cairan</th><th>leher ok/tutup/?</th><th>frame</th><th>poin</th><th>waktu</th></tr></thead>
+        <tbody id="tb"></tbody>
+      </table></div>
+      <p class="note">Kalibrasi di <span class="mono">rvm_kp/config.py</span>: <b>LIQUID_THR</b> dari kolom p_cairan botol berisi vs kosong; <b>AREA_KECIL_TANGGUNG / AREA_TANGGUNG_BESAR</b> dari kolom area_1920 botol 330/350, 390/600, 1000/1500 ml.</p>
+    </section>
+    <section class="panel">
+      <h2>Klaim terakhir</h2>
+      <div class="scroll"><table><thead><tr><th>kode</th><th>poin</th><th>status</th><th>dibuat</th><th>berlaku s.d.</th></tr></thead><tbody id="tc"></tbody></table></div>
+    </section>
+  </div>
+</div>
+
+<script src="/static/icons.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var t = function (ts) { return ts ? new Date(ts * 1000).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'; };
+  var sim = false, auto = false, active = null;
+  function load() {
+    api('/api/operator').then(function (d) {
+      var m = d.mesin; sim = m.sim; auto = !!m.auto;
+      $('st').innerHTML = '<span class="dot' + (m.status === 'siap' ? '' : ' off') + '"></span>' + esc(m.status) + (m.sesi_aktif ? ' · sesi berjalan' : '');
+      $('fps').textContent = m.fps + ' fps';
+      $('simPanel').hidden = !sim; $('bAuto').className = 'btn ' + (auto ? 'btn-lime' : 'btn-ghost');
+      if (active !== m.sesi_aktif || !$('prev').src) { active = m.sesi_aktif; $('prev').src = '/video_feed?t=' + Date.now(); }
+      var tm = d.timings || {};
+      var kv = [['backend', m.backend], ['profil', m.profil], ['kamera', m.kamera], ['ambang cairan', m.ambang_cairan],
+        ['waktu/frame', tm.total ? tm.total.toFixed(0) + ' ms' : '-'], ['botol / tutup / cairan', tm.total ? [tm.botol, tm.tutup, tm.cairan].map(function (v) { return (v || 0).toFixed(0); }).join(' / ') + ' ms' : '-'],
+        ['PLC', d.plc.aktif ? (d.plc.terhubung ? 'terhubung' : 'tidak terhubung') + ' · ' + d.plc.ip : 'nonaktif'], ['konveyor', d.plc.jalan ? 'jalan' : 'berhenti'],
+        ['zona periksa', d.aturan.zona.map(function (v) { return Math.round(v * 100) + '%'; }).join('–')], ['min. suara', d.aturan.min_suara],
+        ['ambang tanpa tutup', Math.round(d.aturan.nocap_frac * 100) + '%'], ['batas diam', d.aturan.idle + ' s'],
+        ['poin k/t/b', [d.aturan.poin.kecil, d.aturan.poin.tanggung, d.aturan.poin.besar].join(' / ')], ['URL QR', d.url_publik],
+        ['botol diterima', fmt(d.stats.botol_total)], ['akun', fmt(d.stats.pengguna)]];
+      if (m.pesan) kv.unshift(['pesan', m.pesan]);
+      $('kv').innerHTML = kv.map(function (x) { return '<div><dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd></div>'; }).join('');
+      $('tb').innerHTML = d.botol.length ? d.botol.map(function (b) {
+        return '<tr class="' + (b.decision === 'terima' ? 'ok' : 'bad') + '"><td>' + b.id + '</td><td>' + esc(b.decision + (b.reason ? ' · ' + b.reason : '')) + '</td><td>' + esc(b.size) +
+          '</td><td>' + fmt(b.area) + '</td><td>' + (b.p_liquid != null ? b.p_liquid.toFixed(3) : '-') + '</td><td>' + esc(b.cap_votes) + '</td><td>' + b.n_frames + '</td><td>' + b.points + '</td><td>' + t(b.ts) + '</td></tr>';
+      }).join('') : '<tr><td colspan="9" style="color:var(--muted)">Belum ada botol. Mulai sesi lalu letakkan botol di belt.</td></tr>';
+      $('tc').innerHTML = d.klaim.length ? d.klaim.map(function (c) {
+        return '<tr><td class="mono">' + esc(c.code) + '</td><td>' + c.points + '</td><td>' + esc(c.status) + '</td><td>' + t(c.created) + '</td><td>' + t(c.expires) + '</td></tr>';
+      }).join('') : '<tr><td colspan="5" style="color:var(--muted)">Belum ada klaim.</td></tr>';
+    }).catch(function (e) { $('st').innerHTML = '<span class="dot off"></span>' + esc(e.message); });
+  }
+  function say(p) { $('msg').textContent = ''; p.then(load).catch(function (e) { $('msg').textContent = e.message; }); }
+  $('bStart').onclick = function () { say(api('/api/sesi/mulai', {})); };
+  $('bEnd').onclick = function () { say(api('/api/sesi/selesai', {})); };
+  $('bAuto').onclick = function () { say(api('/api/sim/auto', { on: !auto })); };
+  document.querySelectorAll('[data-sim]').forEach(function (b) { b.onclick = function () { say(api('/api/sim/botol', JSON.parse(b.getAttribute('data-sim')))); }; });
+  load(); setInterval(load, 2000);
+})();
+</script>
+</body>
+</html>

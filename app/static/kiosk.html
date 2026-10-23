@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Tukar Botol</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Geist:wght@400..700&family=Geist+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/kiosk.css">
+</head>
+<body data-screen="attract">
+
+<header class="top">
+  <div class="brand">
+    <span class="mark" aria-hidden="true"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="19" fill="var(--lime)"/><path d="M17.5 8.5h5v3.4l2 3.2v14.4a2.4 2.4 0 0 1-2.4 2.4h-4.2a2.4 2.4 0 0 1-2.4-2.4V15.1l2-3.2z" fill="none" stroke="var(--ink)" stroke-width="2.2" stroke-linejoin="round"/><path d="M15.6 20.5h8.8" stroke="var(--ink)" stroke-width="2.2"/></svg></span>
+    <span class="brand-name">Tukar Botol</span>
+  </div>
+  <div class="top-right">
+    <span class="chip" id="machineChip"><span class="dot off"></span><span id="machineText">Menghubungkan</span></span>
+    <span class="clock num" id="clock">--.--</span>
+  </div>
+</header>
+
+<main>
+  <!-- ============ LAYAR AWAL ============ -->
+  <section class="screen attract" id="attract" aria-labelledby="heroTitle">
+    <div class="att-left">
+      <svg class="hero-bottle" viewBox="0 0 200 420" aria-hidden="true">
+        <path d="M80 10h40v34l18 28v300a28 28 0 0 1-28 28H90a28 28 0 0 1-28-28V72l18-28z" fill="none" stroke="currentColor" stroke-width="3"/>
+        <path d="M62 150h76M62 250h76" stroke="currentColor" stroke-width="3"/>
+        <path d="M76 10h48" stroke="currentColor" stroke-width="9" stroke-linecap="round"/>
+      </svg>
+      <p class="eyebrow rise" style="animation-delay:.05s">Mesin daur ulang botol PET</p>
+      <h1 class="hero rise" id="heroTitle" style="animation-delay:.12s">Botol kosongmu <span class="hl">masih bernilai.</span></h1>
+      <p class="lede rise" style="animation-delay:.2s">Setor botol plastik, kumpulkan poin, lalu simpan ke akunmu atau donasikan untuk program lingkungan.</p>
+
+      <ol class="rules rise" style="animation-delay:.28s">
+        <li><span class="rule-ic" data-ic="cap"></span><div><b>Lepas tutupnya</b><span>Cincin di leher boleh tertinggal</span></div></li>
+        <li><span class="rule-ic" data-ic="drop"></span><div><b>Pastikan kosong</b><span>Botol berisi minuman ditolak</span></div></li>
+        <li><span class="rule-ic" data-ic="lay"></span><div><b>Baringkan di belt</b><span>Satu per satu, leher ke samping</span></div></li>
+      </ol>
+
+      <div class="cta-row rise" style="animation-delay:.36s">
+        <button class="btn btn-lime btn-xl" id="btnStart" type="button">
+          <span id="btnStartText">Mulai setor botol</span><span data-ic="arrow"></span>
+        </button>
+        <dl class="ptable" id="ptable" aria-label="Poin per ukuran botol">
+          <div><dt>Kecil</dt><dd><b class="num" data-p="kecil">10</b> poin</dd><small>≤ 350 ml</small></div>
+          <div><dt>Tanggung</dt><dd><b class="num" data-p="tanggung">15</b> poin</dd><small>351–800 ml</small></div>
+          <div><dt>Besar</dt><dd><b class="num" data-p="besar">25</b> poin</dd><small>&gt; 800 ml</small></div>
+        </dl>
+      </div>
+      <p class="start-msg" id="startMsg" role="status" aria-live="polite"></p>
+    </div>
+
+    <aside class="att-panel rise" style="animation-delay:.18s" aria-label="Statistik mesin">
+      <div class="panel-block">
+        <p class="eyebrow on-dark">Terkumpul hari ini</p>
+        <div class="today">
+          <span class="num today-n sk" id="todayN">00</span>
+          <span class="today-unit">botol</span>
+        </div>
+        <p class="today-sub" id="todaySub"><span class="sk">memuat statistik</span></p>
+      </div>
+      <div class="panel-block">
+        <div class="pb-head"><p class="eyebrow on-dark">Donasi poin</p><span class="chip chip-dark small">simulasi</span></div>
+        <ul class="camps" id="camps">
+          <li><span class="sk">memuat</span><div class="bar"><i style="transform:scaleX(.3)"></i></div></li>
+          <li><span class="sk">memuat</span><div class="bar"><i style="transform:scaleX(.2)"></i></div></li>
+        </ul>
+      </div>
+      <div class="panel-block grow">
+        <p class="eyebrow on-dark">Aktivitas terakhir</p>
+        <ul class="feed" id="feed"></ul>
+      </div>
+    </aside>
+  </section>
+
+  <!-- ============ SESI BERJALAN ============ -->
+  <section class="screen session" id="session" aria-label="Sesi setor botol">
+    <div class="cam-col">
+      <div class="cam" id="cam">
+        <img id="camImg" alt="Tampilan kamera belt" decoding="async">
+        <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+        <span class="scanline" aria-hidden="true"></span>
+        <span class="chip chip-dark cam-chip"><span class="dot"></span><span id="camInfo">Kamera periksa</span></span>
+        <div class="verdict" id="verdict" role="status" aria-live="assertive"></div>
+      </div>
+      <ul class="cam-hints">
+        <li><span data-ic="cap"></span>Tanpa tutup</li>
+        <li><span data-ic="drop"></span>Kosong</li>
+        <li><span data-ic="lay"></span>Berbaring, satu per satu</li>
+      </ul>
+    </div>
+
+    <div class="side">
+      <div class="side-head">
+        <div>
+          <p class="eyebrow">Poin sesi ini</p>
+          <p class="pts"><span class="num" id="sPts" data-v="0">0</span><span class="pts-unit">poin</span></p>
+        </div>
+        <div class="ring" id="ring" aria-label="Sisa waktu tunggu">
+          <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" class="ring-bg"/><circle cx="32" cy="32" r="28" class="ring-fg" id="ringFg"/></svg>
+          <span class="num" id="ringN">30</span>
+        </div>
+      </div>
+      <div class="side-stats">
+        <span class="chip chip-lime"><span data-ic="check"></span><b id="sValid">0</b> diterima</span>
+        <span class="chip chip-coral"><span data-ic="x"></span><b id="sInvalid">0</b> ditolak</span>
+        <span class="chip"><span data-ic="scale"></span><b id="sGram">0 g</b> plastik</span>
+      </div>
+      <p class="idle-note" id="idleNote">Sesi berhenti sendiri bila 30 detik tidak ada botol.</p>
+
+      <ol class="tickets" id="tickets" aria-live="polite"></ol>
+      <div class="tickets-empty" id="ticketsEmpty">
+        <span data-ic="bottle" data-ic-cls="big"></span>
+        <p><b>Belum ada botol.</b><br>Letakkan botol pertama di belt. Hasil pemeriksaan muncul di sini.</p>
+      </div>
+
+      <button class="btn btn-xl btn-block" id="btnFinish" type="button"><span>Selesai &amp; ambil poin</span><span data-ic="arrow"></span></button>
+    </div>
+  </section>
+
+  <!-- ============ RINGKASAN ============ -->
+  <section class="screen summary" id="summary" data-step="pilih" aria-label="Ringkasan sesi">
+    <header class="sum-head">
+      <div class="sum-head-l">
+        <p class="eyebrow">Sesi selesai</p>
+        <h2 class="sum-title" id="sumTitle">Kerja bagus.</h2>
+        <ul class="sum-stats" id="sumStats"></ul>
+      </div>
+      <p class="sum-pts"><span class="num" id="sumPts" data-v="0">0</span><span>poin</span></p>
+    </header>
+
+    <!-- langkah 1: pilihan besar -->
+    <div class="step step-pilih" role="group" aria-labelledby="pilihQ">
+      <p class="step-q" id="pilihQ">Poinmu mau dipakai untuk apa?</p>
+      <div class="big-choices">
+        <button class="big-choice self" id="chSelf" type="button">
+          <span class="bc-ic" data-ic="wallet"></span>
+          <span class="bc-t"><b>Ambil poin untuk saya</b><span>Pindai QR dengan HP, simpan ke akun, lalu tukar hadiah.</span></span>
+          <span class="bc-go"><span data-ic="phone"></span>Perlu HP<span data-ic="arrow"></span></span>
+        </button>
+        <button class="big-choice give" id="chGive" type="button">
+          <span class="bc-ic" data-ic="heart"></span>
+          <span class="bc-t"><b>Donasikan ke yayasan</b><span>Salurkan poinmu ke program lingkungan. Langsung dari layar ini.</span></span>
+          <span class="bc-go">Tanpa HP<span data-ic="arrow"></span></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- langkah 2a: QR untuk diri sendiri -->
+    <div class="step step-ambil">
+      <div class="ambil-l">
+        <button class="back-link" type="button" data-step-to="pilih"><span data-ic="back"></span>Ganti pilihan</button>
+        <p class="step-q">Simpan poin ke akunmu</p>
+        <ol class="how">
+          <li><b>Buka kamera HP</b><span>Arahkan ke kode QR di samping.</span></li>
+          <li><b>Buka tautan yang muncul</b><span>HP harus tersambung ke Wi-Fi yang sama.</span></li>
+          <li><b>Masuk atau buat akun</b><span>Cukup nomor HP dan PIN 6 angka.</span></li>
+        </ol>
+        <p class="ambil-note">Proses di HP boleh lama: poin tetap aman meskipun layar ini kembali ke awal.</p>
+      </div>
+      <div class="qr-card" id="qrCard">
+        <div class="qr" id="qr"></div>
+        <p class="qr-or">atau ketik kode di <span class="mono" id="qrHost">-</span></p>
+        <p class="code mono" id="code">---·---</p>
+      </div>
+    </div>
+
+    <!-- langkah 2b: pilih yayasan -->
+    <div class="step step-donasi">
+      <div class="donasi-head">
+        <button class="back-link" type="button" data-step-to="pilih"><span data-ic="back"></span>Ganti pilihan</button>
+        <p class="step-q">Pilih yayasan tujuan <span class="chip">simulasi</span></p>
+      </div>
+      <div class="found" id="picks" role="radiogroup" aria-label="Pilih yayasan tujuan donasi"></div>
+      <div class="donasi-act">
+        <p class="donate-msg" id="donateMsg" role="status" aria-live="polite"></p>
+        <button class="btn btn-xl" id="btnDonate" type="button" disabled>Pilih yayasan dulu</button>
+      </div>
+    </div>
+
+    <!-- langkah 3: selesai -->
+    <div class="step step-selesai">
+      <span class="done-badge" id="doneBadge"></span>
+      <div class="done-t">
+        <p class="step-q" id="doneTitle">Terima kasih.</p>
+        <p class="done-sub" id="doneSub"></p>
+        <div class="done-camp" id="doneCamp" hidden>
+          <div class="row"><b id="doneCampName"></b><span id="doneCampNum"></span></div>
+          <div class="bar"><i id="doneCampBar"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HP sudah membuka tautan QR: proses lanjut di HP, tanpa batas waktu layar -->
+    <div class="step step-hp">
+      <span class="done-badge hp" data-ic="phone"></span>
+      <div class="done-t">
+        <p class="step-q">Lanjutkan di HP.</p>
+        <p class="done-sub">HP sudah membuka tautan klaim. Pilih <b>simpan ke akun</b> atau <b>donasikan</b> di sana. Tidak perlu terburu-buru: poinmu aman meskipun layar ini kembali ke awal.</p>
+        <p class="keep-code">Kode klaim <span class="mono" data-code>---·---</span></p>
+      </div>
+    </div>
+
+    <!-- waktu habis tanpa pilihan: poin dititipkan, bukan didonasikan -->
+    <div class="step step-titip">
+      <span class="done-badge titip" data-ic="lock"></span>
+      <div class="done-t">
+        <p class="step-q">Poinmu tetap aman.</p>
+        <p class="done-sub">Belum ada pilihan, jadi poin kami simpan dengan kode di bawah. Ketik kode ini di <span class="mono" data-host>/k</span> dari HP untuk menyimpan atau mendonasikannya.</p>
+        <p class="code mono" data-code>---·---</p>
+        <p class="done-sub small" id="titipUntil"></p>
+      </div>
+    </div>
+
+    <!-- tanpa poin -->
+    <div class="step step-kosong">
+      <p class="done-sub" id="zeroSub">Botol yang ditolak bisa dimasukkan lagi setelah diperbaiki: lepas tutup dan kosongkan isinya.</p>
+    </div>
+
+    <footer class="sum-foot">
+      <div class="foot-timer">
+        <div class="bar back-bar" aria-hidden="true"><i id="backBar"></i></div>
+        <p class="back-note" id="backNote">Kembali ke layar awal otomatis</p>
+      </div>
+      <button class="btn btn-quiet" id="btnDone" type="button">Selesai</button>
+    </footer>
+  </section>
+</main>
+
+<div class="offline" id="offline" role="alert" hidden><span data-ic="wifi"></span>Koneksi ke mesin terputus. Menyambung ulang…</div>
+
+<div class="devbar" id="devbar" hidden>
+  <span class="eyebrow">Simulasi</span>
+  <button type="button" data-sim='{"size":"kecil"}'>1 Kecil</button>
+  <button type="button" data-sim='{"size":"tanggung"}'>2 Tanggung</button>
+  <button type="button" data-sim='{"size":"besar"}'>3 Besar</button>
+  <button type="button" data-sim='{"size":"tanggung","cap":true}'>4 Bertutup</button>
+  <button type="button" data-sim='{"size":"tanggung","liquid":true}'>5 Berisi</button>
+  <button type="button" id="simAuto">A Otomatis</button>
+</div>
+
+<script src="/static/icons.js"></script>
+<script src="/static/kiosk.js"></script>
+</body>
+</html>
