@@ -108,7 +108,7 @@ def cv():
                     fh.write(json.dumps(dict(fold=k, resep=rc, id=r["id"], src=r["src"], kel=r["kel"], baru=r["baru"], liquid=r["liquid"], p=round(p, 4))) + "\n")
             print(f"fold {k} {rc}: latih {len(items)}, uji {len(te)}", flush=True)
     R = [json.loads(l) for l in open(res) if l.strip()]
-    L = ["Uji usul user: data luar (Open Food Facts) dengan potongan BAGUS & KETAT. T0 = data kita saja, T1 = + luar (15 berwarna, 4 kosong; label user), T2 = T1 + 16 air bening sebagai tidak berwarna.", ""]
+    L = ["Uji usul user: data luar (Open Food Facts) dengan potongan BAGUS & KETAT. T0 = data kita saja, T1 = + luar tervalidasi user (14 berwarna, 4 kosong), T2 = T1 + 15 air bening sebagai tidak berwarna.", ""]
     for name, f in (("SEMUA", lambda r: True), ("data lama 16/20 Okt", lambda r: r["baru"] == 0), ("V22 label penuh", lambda r: r["src"] == "V22"),
                     ("S22 frame belt", lambda r: r["src"] == "S22")):
         L.append(f"== {name}")

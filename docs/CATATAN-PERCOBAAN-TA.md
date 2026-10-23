@@ -266,7 +266,15 @@ Regresi model final: TACO tempel 8,8% → 7,9%; TrashNet non-botol 7% → 5% (ka
 ### L-19 Kenapa data luar tidak membantu (analisis 23 Okt, usul user)
 - Model cairan memakai potongan kotak botol (bukan foto utuh), tetapi **botol PET tembus pandang**: latar (belt / meja putih) terlihat MELALUI botol → sumber foto tetap terbaca dari dalam kotak. Menghapus latar otomatis (rembg) **menghapus badan botol bening** (hanya tutup/label tersisa) → tidak dapat dipakai.
 - Saringan kualitas Open Food Facts (botol utuh, tajam, berbentuk botol): hanya 92/1577 lolos (1271 menempel tepi foto: foto produk dibingkai mepet).
-- **Label 'kosong' Open Food Facts = botol PENUH air bening**, bukan kosong; foto produk hampir tidak pernah botol kosong. Pelabelan ulang visual (Claude, menunggu validasi user): 34 berwarna, 40 air bening penuh, 18 buang, **0 kosong**. Data luar praktis hanya membawa satu kelas → jalan pintas sumber. Percobaan T0/T1/T2 (`s33_luar_ketat.py`) menunggu validasi label.
+- **Label 'kosong' Open Food Facts = botol PENUH air bening**, bukan kosong; foto produk hampir tidak pernah botol kosong. Pelabelan ulang visual (Claude, menunggu validasi user): 34 berwarna, 40 air bening penuh, 18 buang, **0 kosong**. Data luar praktis hanya membawa satu kelas → jalan pintas sumber. Percobaan setelah validasi user (`s33_luar_ketat.py`, potongan ketat, tanpa geser-hue, CV 5 fold per kelompok sama dgn s32; data luar hanya di latih):
+
+| resep | AUC | salah /325 | V22 berlabel penuh: AUC, kosong benar | S22 belt: berisi |
+|---|---|---|---|---|
+| T0 data kita | 0,937 | 50 | 0,80 · 6/32 | 22/24 |
+| T1 + luar 14 berwarna + 4 kosong | 0,948 | 50 | 0,81 · 7/32 | 19/24 |
+| T2 = T1 + 15 air bening sebagai 'tidak berwarna' | **0,969** | **43** | **0,91 · 11/32** | **24/24** |
+
+Data luar TERVALIDASI tidak merusak (T1 = T0), dan menambah botol berisi air bening sebagai 'tidak berwarna' (T2) memperbaiki justru kelemahan utama (botol berlabel penuh; dugaan: model belajar memisahkan "ada isi" dari "isinya berwarna"). Efek kecil-sedang (7 foto dari 325), satu kali CV. Catatan: T2 mengajari model bahwa air bening = tidak berwarna (sesuai lingkup resmi), padahal di uji live model sempat menolak botol air bening — konsekuensi kebijakan perlu disepakati. Pembanding resep penuh (dengan geser-hue): RH 45, gabungan RH+RN 40 salah.
 - Pelajaran: data luar membantu hanya bila membawa positif DAN negatif dari sumber yang sama (TrashNet untuk detektor botol), atau berupa variasi data kita sendiri (geser warna RH).
 
 ### L-20 Ukuran dari panjang botol (23 Okt, `scripts/alat/analisis_ukuran.py`)
