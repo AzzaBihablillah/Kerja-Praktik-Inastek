@@ -71,9 +71,10 @@ class RVMAnalyzer:
     """an = RVMAnalyzer("tensorrt", profile="nano"); hasil = an.analyze(frame_bgr); an.last_timings = waktu per tahap (ms)."""
 
     def __init__(self, backend="pytorch", models=None, liquid_thr=config.LIQUID_THR, device=None, profile=None,
-                 cap_mode=None, half=None, frame_width=None, roi_imgsz=None, roi_scale=None):
+                 cap_mode=None, half=None, frame_width=None, roi_imgsz=None, roi_scale=None, size_rule=None):
         p = dict(config.PROFILES[profile or config.DEFAULT_PROFILE])
         self.cap_mode = cap_mode or p["cap_mode"]
+        self.size_rule = size_rule or getattr(config, "SIZE_RULE", "luas")   # "luas" | "panjang"
         self.frame_width = frame_width or p["frame_width"]
         self.roi_imgsz = roi_imgsz or config.CAP_ROI_IMGSZ
         self.roi_scale = roi_scale or config.CAP_ROI_SCALE
@@ -167,7 +168,7 @@ class RVMAnalyzer:
             length = max(x2 - x1, y2 - y1) * (1920 / W)
             if clipped:
                 size = "?"
-            elif getattr(config, "SIZE_RULE", "luas") == "panjang":
+            elif self.size_rule == "panjang":
                 size = ("besar" if length >= config.LEN_TANGGUNG_BESAR or area >= config.AREA_BESAR_PASTI else
                         ("tanggung" if length >= config.LEN_KECIL_TANGGUNG else "kecil"))
             else:

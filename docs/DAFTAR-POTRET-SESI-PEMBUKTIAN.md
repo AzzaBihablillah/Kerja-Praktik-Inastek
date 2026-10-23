@@ -5,10 +5,14 @@
 Model yang diuji (belum aktif sampai sesi ini lolos): detektor `botol_ver10` (CV per benda 22 Okt: non-botol 0/79, botol 154/154), cairan `cairan_berisi_kandidat` (definisi baru: air bening juga ditolak) dibanding RH, ukuran berbasis panjang.
 
 ## Cara (semua lewat aplikasi kiosk, mode berhenti-lalu-pindai, frame diam otomatis tersimpan)
-1. Pastikan area belt aman, lalu minta Claude menjalankan aplikasi dengan model kandidat (`--plc`, jeda 1,0 s).
+1. Pastikan area belt aman, lalu minta Claude menjalankan aplikasi:
+   `venv/Scripts/python.exe -m app --backend pytorch --cam 1 --plc --jeda 1.0 --kandidat`
+   Layar & poin = model AKTIF (ver9c, cap_belt_v2, cairan_RH, ukuran luas). `--kandidat` = model kandidat (ver10, cairan_berisi, ukuran panjang)
+   ikut menilai FRAME DIAM YANG SAMA dan dicatat ke `SCAN_KANDIDAT.csv` → satu sesi langsung jadi perbandingan, tidak perlu mengulang botol.
+   (Diuji offline 23 Okt dengan kamera & PLC tiruan; PLC kini sambung ulang sekali bila putus.)
 2. Masukkan benda satu per satu sesuai daftar; **catat urutan di HP** (mis. "1 kresek hitam, 2 Aqua kosong, ...").
 3. Selesai → Claude membuat `LEMBAR-CEK.jpg` (`scripts/alat/lembar_cek.py`) → kamu sebut nomor yang salah (±5 menit).
-4. Kalau sempat, ulangi sebagian benda dengan model aktif lama (`--terus` tidak perlu) supaya ada pembanding langsung.
+4. Lembar cek (`scripts/alat/lembar_cek.py`) menampilkan keputusan model aktif DAN kandidat per botol; label kamu dipakai untuk menilai keduanya.
 
 ## Daftar (±60 benda/pindaian, ±45 menit)
 | bagian | isi | jumlah | catatan |
