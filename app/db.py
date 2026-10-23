@@ -114,8 +114,9 @@ class DB:
         return _T()
 
     # ------------------------------------------------------------------ sesi & botol
-    def session_start(self):
-        return self.x("INSERT INTO sessions(started) VALUES(?)", (time.time(),))
+    def session_start(self, capturer=False):
+        # sesi kiosk capturer ditandai lewat end_reason sejak awal, agar pemulihan (server mati) tidak membuatkan kode klaim
+        return self.x("INSERT INTO sessions(started, end_reason) VALUES(?, ?)", (time.time(), "capturer" if capturer else None))
 
     def bottle_add(self, sid, b):
         with self.tx():
@@ -128,14 +129,15 @@ class DB:
             self.c.execute(f"UPDATE sessions SET {col}={col}+1, points=points+?, grams=grams+? WHERE id=?",
                            (b["points"], b["grams"], sid))
 
-    def session_end(self, sid, reason):
-        """Tutup sesi; bila ada poin, buat klaim (kode QR). Mengembalikan (ringkasan sesi, klaim | None)."""
+    def session_end(self, sid, reason, make_claim=True):
+        """Tutup sesi; bila ada poin (dan make_claim), buat klaim (kode QR). Mengembalikan (ringkasan sesi, klaim | None).
+        make_claim=False: mode kiosk capturer (--ambil-data), poin hanya tampil, tidak bisa diklaim."""
         now = time.time()
         with self.tx():
             self.c.execute("UPDATE sessions SET ended=?, end_reason=? WHERE id=?", (now, reason, sid))
             s = dict(self.c.execute("SELECT * FROM sessions WHERE id=?", (sid,)).fetchone())
             claim = None
-            if s["points"] > 0:
+            if s["points"] > 0 and make_claim:
                 for _ in range(20):
                     code = new_code()
                     if not self.c.execute("SELECT 1 FROM claims WHERE code=?", (code,)).fetchone():
@@ -150,12 +152,13 @@ class DB:
         ditutup dengan alasan 'pemulihan'; bila ada poin, dibuatkan kode klaim (terlihat di panel operator).
         Ambang diam mencegah sesi yang masih berjalan (mis. server lain di database yang sama) ikut ditutup."""
         now = time.time()
-        rows = self.q("SELECT s.id, MAX(s.started, COALESCE((SELECT MAX(ts) FROM bottles b WHERE b.session_id=s.id), 0)) AS last"
+        rows = self.q("SELECT s.id, s.end_reason, MAX(s.started, COALESCE((SELECT MAX(ts) FROM bottles b WHERE b.session_id=s.id), 0)) AS last"
                       " FROM sessions s WHERE s.ended IS NULL")
         out = []
         for r in rows:
             if r["id"] != skip_id and r["last"] < now - min_idle:
-                out.append(self.session_end(r["id"], "pemulihan"))
+                cap = r["end_reason"] == "capturer"
+                out.append(self.session_end(r["id"], "capturer_pemulihan" if cap else "pemulihan", make_claim=not cap))
         return out
 
     def session_bottles(self, sid):

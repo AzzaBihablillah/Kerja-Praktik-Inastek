@@ -35,6 +35,43 @@ def rc_imgsz(an, which):
     return {"bottle": c.IMGSZ_BOTTLE, "cap": c.IMGSZ_CAP_FULL, "liquid": c.IMGSZ_LIQUID}[which]
 
 
+def scan_dir():
+    import datetime
+    d = config.SCAN_SAVE_DIR.replace("{tanggal}", datetime.date.today().isoformat()); os.makedirs(d, exist_ok=True)
+    return d
+
+
+def csv_add(path, row, order):
+    """Tambah satu baris (dict) ke CSV. Bila file lama belum punya kolom baru, file ditulis ulang dengan kolom tambahan
+    (isi lama tetap, kolom baru kosong) — kolom yang ditambahkan tangan (mis. label_manual) juga dipertahankan."""
+    import csv
+    head = list(order)
+    if os.path.exists(path):
+        with open(path, newline="") as fh:
+            old = next(csv.reader(fh), None)
+        if old:
+            extra = [c for c in head if c not in old]
+            if extra:
+                with open(path, newline="") as fh:
+                    rows = list(csv.DictReader(fh))
+                with open(path, "w", newline="") as fh:
+                    w = csv.DictWriter(fh, old + extra); w.writeheader(); w.writerows(rows)
+            head = old + extra
+    new = not os.path.exists(path)
+    with open(path, "a", newline="") as fh:
+        w = csv.DictWriter(fh, head, extrasaction="ignore")
+        if new:
+            w.writeheader()
+        w.writerow(row)
+
+
+SCAN_COLS = ["waktu", "sesi", "botol", "keputusan", "alasan", "p_cairan", "p_per_frame", "tutup_suara", "ukuran", "jeda_s", "berhenti_s",
+             "label_manual", "kelompok", "k_isi", "k_tutup", "k_produk", "k_ml", "harapan", "cocok"]
+KANDIDAT_COLS = ["waktu", "sesi", "botol", "keputusan_kandidat", "alasan_kandidat", "p_cairan_kandidat", "p_per_frame", "ukuran_kandidat",
+                 "plc_berhenti_ok", "p_coca_kandidat", "merek_kandidat", "cocok_kandidat"]
+KELOMPOK_COLS = ["kelompok", "tanggal", "mulai", "isi", "tutup", "produk", "ml", "catatan", "harapan"]
+
+
 class Machine:
     def __init__(self, db, conveyor, emit, sim=False, backend=config.BACKEND, profile=config.PROFILE, cam=config.CAMERA_INDEX):
         self.db, self.conveyor, self.emit = db, conveyor, emit
@@ -51,6 +88,7 @@ class Machine:
         self._stop = threading.Event()
         self._last_stamp = ""
         self.an2 = None; self.brand2 = None
+        self.batch = None                   # label kelompok aktif (kiosk capturer, --ambil-data)
         self.session = None                 # dict saat sesi aktif
         self.last_summary = None
         self._t = threading.Thread(target=self._run, name="rvm-engine", daemon=True)
@@ -214,15 +252,15 @@ class Machine:
         t.votes = [(r.cap, r.cap_conf, r.p_liquid, r.size, r.area_1920) for r in votes]
         t.decided = True
         b = decide(t, self.liquid_thr); b["mode"] = "berhenti"; b["stop_sec"] = round(t_scan, 2)
+        self._tag(b)
         self._save_scan(t, b, frames, votes)
         if self.an2 is not None:
-            self._shadow(t, frames, plc_ok)
+            self._shadow(t, frames, plc_ok, b)
         return b
 
-    def _shadow(self, t, frames, plc_ok):
+    def _shadow(self, t, frames, plc_ok, b=None):
         """Model kandidat menilai frame diam yang sama; hasil hanya dicatat (SCAN_KANDIDAT.csv), tidak memengaruhi layar/poin."""
         try:
-            import csv, datetime
             vv = []
             for f in frames:
                 res = self.an2.analyze(f)
@@ -241,18 +279,18 @@ class Machine:
                     pc = round(self.brand2.p_coca(frames, t.box), 3)
                 except Exception as e:
                     print("[kandidat] merek gagal:", e)
+            hk = b.get("harapan", "") if b else ""
+            if b is not None:
+                b["kandidat"] = k["decision"]; b["kandidat_alasan"] = k.get("reason") or ""
+                b["cocok_kandidat"] = "" if not hk else ("ya" if k["decision"] == hk else "tidak")
             if not config.SCAN_SAVE_DIR:
                 return
-            d = config.SCAN_SAVE_DIR.replace("{tanggal}", datetime.date.today().isoformat()); os.makedirs(d, exist_ok=True)
-            p = os.path.join(d, "SCAN_KANDIDAT.csv"); new = not os.path.exists(p)
-            with open(p, "a", newline="") as fh:
-                w = csv.writer(fh)
-                if new:
-                    w.writerow(["waktu", "sesi", "botol", "keputusan_kandidat", "alasan_kandidat", "p_cairan_kandidat", "p_per_frame",
-                                "ukuran_kandidat", "plc_berhenti_ok", "p_coca_kandidat", "merek_kandidat"])
-                w.writerow([self._last_stamp, self.session["id"] if self.session else 0, t.id, k["decision"], k.get("reason") or "",
-                            k["p_liquid"], " ".join("%.2f" % r.p_liquid for r in vv), k["size"], plc_ok, pc,
-                            "" if pc == "" else ("coca_cola" if pc >= self.brand2.thr else "non_coca_cola")])
+            csv_add(os.path.join(scan_dir(), "SCAN_KANDIDAT.csv"), dict(
+                waktu=self._last_stamp, sesi=self.session["id"] if self.session else 0, botol=t.id, keputusan_kandidat=k["decision"],
+                alasan_kandidat=k.get("reason") or "", p_cairan_kandidat=k["p_liquid"], p_per_frame=" ".join("%.2f" % r.p_liquid for r in vv),
+                ukuran_kandidat=k["size"], plc_berhenti_ok=plc_ok, p_coca_kandidat=pc,
+                merek_kandidat="" if pc == "" else ("coca_cola" if pc >= self.brand2.thr else "non_coca_cola"),
+                cocok_kandidat=b.get("cocok_kandidat", "") if b else ""), KANDIDAT_COLS)
         except Exception as e:
             print("[kandidat] gagal:", e)
 
@@ -261,20 +299,20 @@ class Machine:
         if not config.SCAN_SAVE_DIR:
             return
         try:
-            import csv, datetime
-            d = config.SCAN_SAVE_DIR.replace("{tanggal}", datetime.date.today().isoformat()); os.makedirs(d, exist_ok=True)
+            import datetime
+            d = scan_dir()
             stamp = datetime.datetime.now().strftime("%H%M%S")
-            self._last_stamp = stamp
+            self._last_stamp = stamp; b["waktu"] = stamp
             sid = self.session["id"] if self.session else 0
             for i, f in enumerate(frames):
                 cv2.imwrite(os.path.join(d, "s%d_b%d_%s_%d.png" % (sid, t.id, stamp, i + 1)), f, [cv2.IMWRITE_PNG_COMPRESSION, 3])
-            p = os.path.join(d, "SCAN.csv"); new = not os.path.exists(p)
-            with open(p, "a", newline="") as fh:
-                w = csv.writer(fh)
-                if new:
-                    w.writerow(["waktu", "sesi", "botol", "keputusan", "alasan", "p_cairan", "p_per_frame", "tutup_suara", "ukuran", "jeda_s", "berhenti_s", "label_manual"])
-                w.writerow([stamp, sid, t.id, b["decision"], b.get("reason") or "", b["p_liquid"], " ".join("%.2f" % r.p_liquid for r in votes),
-                            b["cap_votes"], b["size"], config.STOP_SETTLE_SEC, b["stop_sec"], ""])
+            k = self.batch if config.DATA_MODE else None
+            csv_add(os.path.join(d, "SCAN.csv"), dict(
+                waktu=stamp, sesi=sid, botol=t.id, keputusan=b["decision"], alasan=b.get("reason") or "", p_cairan=b["p_liquid"],
+                p_per_frame=" ".join("%.2f" % r.p_liquid for r in votes), tutup_suara=b["cap_votes"], ukuran=b["size"],
+                jeda_s=config.STOP_SETTLE_SEC, berhenti_s=b["stop_sec"], label_manual="", kelompok=b.get("kelompok", ""),
+                k_isi=k["isi"] if k else "", k_tutup=k["tutup"] if k else "", k_produk=k["produk"] if k else "", k_ml=k["ml"] if k else "",
+                harapan=b.get("harapan", ""), cocok=b.get("cocok", "")), SCAN_COLS)
         except Exception as e:
             print("[scan] simpan gagal:", e)
 
@@ -305,6 +343,8 @@ class Machine:
     # ------------------------------------------------------------------ sesi
     def _record(self, b):
         s = self.session
+        if config.DATA_MODE:
+            self._count(b)
         self.db.bottle_add(s["id"], b)
         s["bottles"].append(b)
         if b["decision"] == "terima":
@@ -312,6 +352,61 @@ class Machine:
         else:
             s["invalid"] += 1
         self.emit(dict(type="bottle", bottle=b, session=self.session_public()))
+
+    # ------------------------------------------------------------------ kiosk capturer (--ambil-data)
+    def set_batch(self, isi, tutup, produk="", ml="", catatan=""):
+        """Label kelompok untuk SEMUA botol berikutnya sampai diganti (mis. 'air_bening' + 'tanpa' + 'Aqua 600')."""
+        import datetime
+        if isi not in config.KELOMPOK_ISI or tutup not in config.KELOMPOK_TUTUP:
+            raise ValueError("Label kelompok tidak dikenal.")
+        now = datetime.datetime.now()
+        k = dict(id=now.strftime("K%H%M%S"), mulai=time.time(), isi=isi, tutup=tutup, produk=(produk or "").strip()[:60],
+                 ml=str(ml or "").strip()[:10], catatan=(catatan or "").strip()[:160], harapan=config.harapan_kelompok(isi, tutup),
+                 n=0, cocok=0, n_k=0, cocok_k=0, beda=[])
+        with self.lock:
+            self.batch = k
+        if config.SCAN_SAVE_DIR and not self.sim:          # simulasi: tidak menulis ke folder data asli
+            try:
+                csv_add(os.path.join(scan_dir(), "KELOMPOK.csv"), dict(
+                    kelompok=k["id"], tanggal=now.date().isoformat(), mulai=now.strftime("%H:%M:%S"), isi=isi, tutup=tutup,
+                    produk=k["produk"], ml=k["ml"], catatan=k["catatan"], harapan=k["harapan"]), KELOMPOK_COLS)
+            except Exception as e:
+                print("[capturer] KELOMPOK.csv gagal:", e)
+        print("[capturer] kelompok %s: isi=%s tutup=%s produk=%s harapan=%s" % (k["id"], isi, tutup, k["produk"], k["harapan"] or "-"), flush=True)
+        return self.batch_public()
+
+    def batch_public(self):
+        k = self.batch
+        if k is None:
+            return None
+        out = dict((x, v) for x, v in k.items() if x != "beda")
+        out["beda"] = k["beda"][-10:][::-1]
+        return out
+
+    def _tag(self, b):
+        """Tempel label kelompok aktif + keputusan yang diharapkan ke hasil botol (sekali)."""
+        if not config.DATA_MODE or "kelompok" in b:
+            return
+        k = self.batch
+        b["kelompok"] = k["id"] if k else ""
+        b["harapan"] = k["harapan"] if k else ""
+        b["cocok"] = "" if not b["harapan"] else ("ya" if b["decision"] == b["harapan"] else "tidak")
+
+    def _count(self, b):
+        self._tag(b)
+        k = self.batch
+        if k is None or b.get("kelompok") != k["id"]:
+            return
+        k["n"] += 1
+        if not k["harapan"]:
+            return
+        k["cocok"] += b["cocok"] == "ya"
+        if b.get("cocok_kandidat"):
+            k["n_k"] += 1; k["cocok_k"] += b["cocok_kandidat"] == "ya"
+        if b["cocok"] != "ya" or b.get("cocok_kandidat") == "tidak":
+            k["beda"].append(dict(botol=b["id"], waktu=b.get("waktu", ""), aktif=b["decision"] + (" · " + b["reason"] if b.get("reason") else ""),
+                                  kandidat=(b.get("kandidat", "") + (" · " + b["kandidat_alasan"] if b.get("kandidat_alasan") else "")),
+                                  p_cairan=b["p_liquid"], ukuran=b["size"]))
 
     def session_public(self):
         s = self.session
@@ -326,7 +421,7 @@ class Machine:
                 return None, "Mesin belum siap: %s" % (self.status_msg or self.status)
             if self.session is not None:
                 return None, "Sesi sudah berjalan."
-            sid = self.db.session_start(); now = time.time()
+            sid = self.db.session_start(capturer=config.DATA_MODE); now = time.time()
             self.session = dict(id=sid, started=now, last_seen=now, points=0, valid=0, invalid=0, grams=0, bottles=[])
             self.tracker.reset()
             self.last_summary = None
@@ -342,10 +437,10 @@ class Machine:
                 self._record(decide(t, self.liquid_thr))
             s = self.session; self.session = None
         self.conveyor.run(False)
-        row, claim = self.db.session_end(s["id"], reason)
+        row, claim = self.db.session_end(s["id"], ("capturer_" + reason) if config.DATA_MODE else reason, make_claim=not config.DATA_MODE)
         self.last_summary = dict(session=dict(id=s["id"], points=row["points"], valid=row["valid"], invalid=row["invalid"],
                                               grams=row["grams"], durasi=int(time.time() - s["started"]), bottles=s["bottles"]),
-                                 claim=claim, reason=reason, ts=time.time())
+                                 claim=claim, reason=reason, ts=time.time(), capturer=config.DATA_MODE)
         self.emit(dict(type="session_end", **self.last_summary))
         return self.last_summary
 
@@ -355,4 +450,4 @@ class Machine:
     def machine_status(self):
         return dict(status=self.status, pesan=self.status_msg, sim=self.sim, backend="simulasi" if self.sim else self.backend,
                     profil=self.profile, kamera=self.cam_index, fps=round(self.fps, 1), ambang_cairan=self.liquid_thr,
-                    sesi_aktif=self.session is not None, auto=getattr(self.an, "auto", None) if self.sim else None)
+                    sesi_aktif=self.session is not None, capturer=config.DATA_MODE, auto=getattr(self.an, "auto", None) if self.sim else None)

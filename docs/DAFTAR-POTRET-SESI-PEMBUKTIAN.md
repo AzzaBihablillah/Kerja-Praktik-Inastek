@@ -42,5 +42,12 @@ Model merek gagal pada produk yang botol fisiknya sedikit (data internet tidak m
 
 Tulis nama produk di catatan HP. Pembanding non-Coca-Cola yang mirip dan sering salah diterima: **Sunbay, Pristine, Big Cola/Big Nipis Madu, Mizone, Superindo**. Masing-masing 1–2 botol beda bila ada.
 
+### H. Batas operasi (±5 menit, rencana ketahanan medan 24 Okt)
+Catat kondisi medan tempat model divalidasi (untuk TA & penerus):
+- tinggi lensa kamera dari permukaan belt (cm, meteran) dan kemiringan kamera (lurus ke bawah / miring);
+- lebar belt yang terlihat di frame (cm) — sekalian cek kalibrasi ukuran;
+- pencahayaan: lampu apa saja yang menyala, ada cahaya jendela atau tidak; lux di atas belt bila ada aplikasi light meter di HP;
+- foto setup dari samping (kamera + belt + lampu) dan satu foto belt kosong dari kamera.
+
 ## Setelah sesi
 Claude: hitung per bagian (diterima/ditolak benar), bandingkan dengan model lama, catat di `CATATAN-PERCOBAAN-TA.md`, lalu (bila lolos) usulkan mengaktifkan `ver10` / gabungan cairan / ukuran panjang. Frame berlabel juga jadi data latih berikutnya.

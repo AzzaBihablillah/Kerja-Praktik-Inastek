@@ -1,4 +1,4 @@
-"""python -m app [--sim] [--backend pytorch|tensorrt|openvino|onnx] [--cam N] [--plc] [--terus] [--jeda S] [--kandidat] [--port 8000] [--url http://IP:8000]
+"""python -m app [--sim] [--backend pytorch|tensorrt|openvino|onnx] [--cam N] [--plc] [--terus] [--jeda S] [--kandidat] [--ambil-data] [--port 8000] [--url http://IP:8000]
 Jalankan dari folder proyek (induk app/ dan rvm_kp/)."""
 import argparse
 import os
@@ -17,6 +17,8 @@ def main():
     ap.add_argument("--jeda", type=float, default=config.STOP_SETTLE_SEC, help="detik menunggu botol diam setelah konveyor berhenti")
     ap.add_argument("--no-simpan", action="store_true", help="jangan simpan frame diam tiap botol")
     ap.add_argument("--kandidat", action="store_true", help="nilai juga dengan model kandidat (bayangan, hanya dicatat; layar tetap model aktif)")
+    ap.add_argument("--ambil-data", action="store_true",
+                    help="KIOSK CAPTURER: label kelompok di /operator dicatat per botol & dibandingkan dengan model; tanpa kode klaim; sesi tidak berakhir karena diam 30 s")
     ap.add_argument("--host", default=config.HOST)
     ap.add_argument("--port", type=int, default=config.PORT)
     ap.add_argument("--url", default=config.PUBLIC_BASE_URL, help="alamat untuk QR klaim, mis. http://192.168.0.20:8000")
@@ -29,6 +31,11 @@ def main():
         config.SCAN_SAVE_DIR = ""
     if a.kandidat:
         config.SHADOW = True
+    if a.ambil_data:
+        if a.no_simpan or a.terus:
+            ap.error("--ambil-data butuh frame diam tersimpan: jangan dipakai bersama --no-simpan atau --terus")
+        config.DATA_MODE = True
+        config.IDLE_TIMEOUT = config.DATA_IDLE_TIMEOUT
     os.environ.setdefault("YOLO_AUTOINSTALL", "False")       # cegah Ultralytics memasang paket sendiri
     from . import server
     server.OPTS.update(sim=a.sim, backend=a.backend, profile=a.profil, cam=a.cam, plc=a.plc, port=a.port, public_url=a.url)

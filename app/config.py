@@ -53,6 +53,29 @@ KANDIDAT = dict(bottle=os.path.join(_M, "botol_ver10_kandidat.pt"), liquid=os.pa
                 # merek (24 Okt): coca_cola vs non_coca_cola, resep A (foto belt saja), dinilai pada kotak botol model AKTIF; bonus tetap 0
                 brand=os.path.join(_M, "merek_coca_kandidat.pt"))
 
+# ---- mode KIOSK CAPTURER / ambil data (24 Okt, `--ambil-data`) ----
+# Mesin dipakai seperti biasa (berhenti-lalu-pindai, poin tampil) sambil mengumpulkan data belt nyata.
+# Operator memilih LABEL KELOMPOK di /operator ("semua botol berikutnya: air bening, tanpa tutup, Aqua 600"); label itu
+# ikut tercatat per botol di SCAN.csv dan dibandingkan dengan keputusan model -> cukup periksa botol yang BEDA (lembar_cek --beda).
+# Sesi tidak berakhir karena diam 30 s, dan TIDAK membuat kode klaim (database poin/akun tidak terisi data percobaan).
+DATA_MODE = False
+DATA_IDLE_TIMEOUT = 3600     # sesi capturer berakhir sendiri hanya setelah 1 jam tanpa botol
+KELOMPOK_ISI = ("kosong", "air_bening", "berwarna", "campur", "bukan_botol")
+KELOMPOK_TUTUP = ("tanpa", "bertutup", "campur")
+
+
+def harapan_kelompok(isi, tutup):
+    """Keputusan yang SEHARUSNYA untuk label kelompok (kebijakan 23 Okt: berisi apa pun, termasuk air bening, ditolak).
+    '' = tidak bisa diharapkan (campur). bukan_botol: seharusnya tidak terpindai sama sekali."""
+    if isi == "bukan_botol":
+        return "tidak_terdeteksi"
+    if tutup == "bertutup" or isi in ("air_bening", "berwarna"):
+        return "tolak"
+    if isi == "kosong" and tutup == "tanpa":
+        return "terima"
+    return ""
+
+
 # ---- sesi ----
 IDLE_TIMEOUT = 30            # detik tanpa botol terlihat -> sesi berakhir (sama dengan alur mesin)
 SUMMARY_SEC = 75             # layar ringkasan kembali ke layar awal setelah ini

@@ -3,8 +3,11 @@
 Tiap botol: potongan frame diam pertama + keputusan mesin (hijau terima / merah tolak), skor cairan, ukuran
 (+ baris KANDIDAT dan MEREK bila app dijalankan dengan --kandidat).
 Keluaran: <dir>/LEMBAR-CEK.jpg (dan LEMBAR-CEK-2.jpg dst. bila > 32 botol). Label user ditulis ke kolom label_manual SCAN.csv
-(oleh Claude, dari jawaban chat "#9 air bening, #13 kosong"; nomor = urutan baris SCAN.csv yang tampil)."""
-import argparse, csv, os, sys
+(oleh Claude, dari jawaban chat "#9 air bening, #13 kosong"; nomor = urutan baris SCAN.csv yang tampil).
+Kiosk capturer (app --ambil-data): tiap kotak menampilkan label kelompok; `--beda` hanya menampilkan botol yang keputusan model
+aktif/kandidat TIDAK sesuai label kelompok (+ `--acak N` sampel acak dari yang sesuai, untuk cek label kelompoknya) -> LEMBAR-BEDA.jpg.
+Nomor tetap = urutan di lembar lengkap, jadi bisa dicocokkan."""
+import argparse, csv, os, random, sys
 import cv2, numpy as np
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, REPO)
@@ -12,6 +15,8 @@ from rvm_kp import config
 from ultralytics import YOLO
 
 ap = argparse.ArgumentParser(); ap.add_argument("--dir", required=True); ap.add_argument("--sesi", nargs="*", default=None)
+ap.add_argument("--beda", action="store_true", help="hanya botol yang tidak sesuai label kelompok (kiosk capturer)")
+ap.add_argument("--acak", type=int, default=0, help="dengan --beda: tambah N botol acak yang sesuai, untuk cek label kelompok")
 a = ap.parse_args()
 D = a.dir if os.path.isabs(a.dir) else os.path.join(REPO, "datasets", a.dir)
 det = YOLO(config.MODEL_SETS["pytorch"]["bottle"])
@@ -23,7 +28,16 @@ if a.sesi:
     R = [r for r in R if r["sesi"] in a.sesi]
 AL = {"": "DITERIMA", "tutup": "TOLAK: bertutup", "tutup_cairan": "TOLAK: bertutup+berisi", "cairan": "TOLAK: berisi", "leher": "TOLAK: leher?"}
 tiles = []
-for i, r in enumerate(R, 1):
+ROWS = list(enumerate(R, 1))
+if a.beda:
+    def _beda(r):
+        k = KD.get((r["sesi"], r["botol"], r["waktu"])) or {}
+        return r.get("cocok") == "tidak" or k.get("cocok_kandidat") == "tidak"
+    bad = [x for x in ROWS if _beda(x[1])]
+    ok = [x for x in ROWS if not _beda(x[1]) and x[1].get("harapan")]
+    ROWS = sorted(bad + random.Random(0).sample(ok, min(a.acak, len(ok))))
+    print(f"{len(bad)} botol beda dari label kelompok + {min(a.acak, len(ok))} sampel acak yang sesuai")
+for i, r in ROWS:
     f = f"{D}/s{r['sesi']}_b{r['botol']}_{r['waktu']}_1.png"
     if not os.path.exists(f):
         continue
@@ -38,7 +52,9 @@ for i, r in enumerate(R, 1):
     im = cv2.copyMakeBorder(im, top, max(0, 170 - im.shape[0]), 0, 0, cv2.BORDER_CONSTANT)[:170 + top]
     col = (60, 200, 60) if r["keputusan"] == "terima" else (60, 60, 230)
     cv2.rectangle(im, (0, 0), (420, 50), col, -1)
-    cv2.putText(im, f"#{i}  {r['waktu'][:2]}:{r['waktu'][2:4]}:{r['waktu'][4:]}  sesi {r['sesi']}", (6, 20), 0, 0.6, (255, 255, 255), 2)
+    KS = {"air_bening": "bening", "berwarna": "warna", "bukan_botol": "bukan", "bertutup": "tutup"}
+    kel = (f" {KS.get(r.get('k_isi'), r.get('k_isi'))}/{KS.get(r.get('k_tutup'), r.get('k_tutup'))}" + (" BEDA" if r.get("cocok") == "tidak" else "")) if r.get("kelompok") else ""
+    cv2.putText(im, f"#{i} {r['waktu'][:2]}:{r['waktu'][2:4]}:{r['waktu'][4:]} s{r['sesi']}{kel}", (6, 20), 0, 0.6, (255, 255, 255), 2)
     cv2.putText(im, f"{AL.get(r['alasan'], r['alasan'])}  cairan {float(r['p_cairan']):.2f}  {r['ukuran']}", (6, 43), 0, 0.55, (255, 255, 255), 2)
     k = KD.get((r["sesi"], r["botol"], r["waktu"]))
     if KD:
@@ -51,10 +67,12 @@ for i, r in enumerate(R, 1):
             cv2.rectangle(im, (0, 75), (420, 96), (40, 40, 40), -1)
             cv2.putText(im, mt, (6, 91), 0, 0.5, (0, 0, 255) if pc and float(pc) >= 0.5 else (200, 200, 200), 1)
     tiles.append(im)
+if not tiles:
+    print("tidak ada botol untuk ditampilkan")
 for s in range(0, len(tiles), 32):
     ch = tiles[s:s + 32]
     while len(ch) % 4:
         ch.append(np.zeros_like(tiles[0]))
-    out = f"{D}/LEMBAR-CEK{'' if s == 0 else '-' + str(s // 32 + 1)}.jpg"
+    out = f"{D}/LEMBAR-{'BEDA' if a.beda else 'CEK'}{'' if s == 0 else '-' + str(s // 32 + 1)}.jpg"
     cv2.imwrite(out, np.vstack([np.hstack(ch[j:j + 4]) for j in range(0, len(ch), 4)]), [cv2.IMWRITE_JPEG_QUALITY, 80])
     print(out)

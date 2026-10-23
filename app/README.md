@@ -27,6 +27,18 @@ Opsi lain: `--profil laptop`, `--port 8000`, `--url http://192.168.0.20:8000` (a
 
 Mode simulasi: tombol di bar atas layar sesi, atau tombol keyboard `1` kecil, `2` tanggung, `3` besar, `4` bertutup, `5` berisi, `A` otomatis.
 
+## Kiosk capturer (`--ambil-data`): demo sekaligus pengumpul data
+```bash
+venv/Scripts/python.exe -m app --backend pytorch --cam 1 --plc --jeda 1.0 --kandidat --ambil-data
+```
+Mesin bekerja seperti biasa (berhenti-lalu-pindai, poin tampil di kiosk), dengan tanda **KIOSK CAPTURER** di kiosk dan `/operator`. Bedanya:
+- Di `/operator` (bisa dari HP) pilih **label kelompok** untuk semua botol berikutnya: isi (kosong / air bening / berwarna / campur / bukan botol), tutup (tanpa / bertutup / campur), produk, ml, catatan → **Mulai kelompok ini**. Ganti label setiap kali jenis botol yang dimasukkan berganti.
+- Tiap botol: frame diam (PNG) + baris `SCAN.csv` berisi label kelompok, keputusan yang **seharusnya** (kebijakan 23 Okt: berisi apa pun ditolak) dan `cocok` ya/tidak; `KELOMPOK.csv` mencatat tiap kelompok; dengan `--kandidat` juga `cocok_kandidat` di `SCAN_KANDIDAT.csv`.
+- Panel menampilkan penghitung langsung (terpindai, model aktif sesuai, kandidat sesuai) dan daftar botol yang **beda**.
+- Sesi tidak berakhir karena diam 30 s (baru setelah 1 jam), dan **tidak membuat kode klaim** (sesi ditandai `capturer_*`; pemulihan juga tanpa klaim).
+- Sesudahnya cukup periksa yang beda: `python scripts/alat/lembar_cek.py --dir 1_foto_mentah/<tanggal>_scan_app --beda --acak 5` → `LEMBAR-BEDA.jpg` (botol beda + 5 sampel acak yang sesuai, untuk memastikan label kelompoknya benar).
+- Label kelompok = label lemah: satu botol yang salah masuk kelompok ikut salah label. Sampel acak `--acak` ada untuk menangkap ini.
+
 HP harus **satu jaringan Wi-Fi/LAN** dengan mesin agar QR bisa dibuka. Pastikan firewall mengizinkan port 8000.
 
 ## Alur pengguna

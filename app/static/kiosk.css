@@ -16,6 +16,7 @@ main { position: relative; min-height: 0; }
 .mark svg { width: clamp(30px, 4.6vh, 42px); height: auto; display: block; }
 .brand-name { font-family: var(--display); font-weight: 800; font-size: clamp(18px, 2.8vh, 24px); letter-spacing: -.03em; }
 .top-right { display: flex; align-items: center; gap: 16px; }
+.cap-chip { color: var(--lime); letter-spacing: .06em; font-weight: 700; }
 .clock { font-size: clamp(18px, 2.8vh, 24px); }
 
 /* ---------- layar ---------- */

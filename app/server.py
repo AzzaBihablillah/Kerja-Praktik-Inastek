@@ -355,6 +355,25 @@ class AutoIn(BaseModel):
     on: bool
 
 
+class KelompokIn(BaseModel):
+    isi: str
+    tutup: str
+    produk: str = ""
+    ml: str = ""
+    catatan: str = ""
+
+
+@app.post("/api/kelompok")
+def kelompok(body: KelompokIn):
+    """Kiosk capturer: label kelompok untuk semua botol berikutnya."""
+    if not config.DATA_MODE:
+        raise AppError("Hanya tersedia di mode kiosk capturer (--ambil-data).", 400)
+    try:
+        return dict(ok=True, kelompok=machine.set_batch(body.isi, body.tutup, body.produk, body.ml, body.catatan))
+    except ValueError as e:
+        raise AppError(str(e))
+
+
 @app.get("/api/operator")
 def operator():
     rows = db.q("SELECT b.*, s.started FROM bottles b LEFT JOIN sessions s ON s.id=b.session_id ORDER BY b.id DESC LIMIT 40")
@@ -363,7 +382,9 @@ def operator():
     return dict(mesin=machine.machine_status(), plc=conveyor.status(), timings=getattr(machine.an, "last_timings", {}),
                 botol=rows, sesi=sess, klaim=claims, stats=db.stats(), url_publik=base_url(),
                 aturan=dict(zona=config.ZONE_X, min_suara=config.MIN_VOTES, nocap_frac=config.NOCAP_FRAC,
-                            idle=config.IDLE_TIMEOUT, poin=config.POINTS_BY_SIZE))
+                            idle=config.IDLE_TIMEOUT, poin=config.POINTS_BY_SIZE),
+                capturer=dict(aktif=config.DATA_MODE, kelompok=machine.batch_public(), isi=config.KELOMPOK_ISI, tutup=config.KELOMPOK_TUTUP,
+                              folder=config.SCAN_SAVE_DIR, kandidat=config.SHADOW))
 
 
 @app.post("/api/sim/botol")

@@ -29,6 +29,24 @@
   .note { font-size: 13px; color: var(--muted); margin-top: 8px; max-width: 70ch; }
   .stack { display: grid; gap: 20px; }
   @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+  /* kiosk capturer (--ambil-data) */
+  .cap-banner { display: none; margin: -4px 0 16px; padding: 10px 14px; border-radius: 12px; background: var(--panel); color: #f3efe4; font-size: 14px; }
+  .cap-banner b { color: var(--lime); letter-spacing: .06em; }
+  body.capturer .cap-banner { display: block; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+  .seg label { position: relative; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg span { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 999px; background: var(--paper-2); font-weight: 600; font-size: 14px; cursor: pointer; }
+  .seg input:checked + span { background: var(--ink); color: #f3efe4; }
+  .seg input:focus-visible + span { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .flab { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 8px; margin-bottom: 8px; }
+  .fields input, .cat { width: 100%; min-height: 40px; border-radius: 10px; border: 1.5px solid var(--line); padding: 0 10px; font: inherit; background: #fff; }
+  .cur { margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: var(--paper-2); }
+  .cur .big { font-size: 15px; font-weight: 650; }
+  .cnt { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  .cnt b { font-size: 22px; display: block; }
+  .cnt span { font-size: 12px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -39,6 +57,8 @@
     <a class="btn btn-quiet" href="/" target="_blank" rel="noopener">Buka kiosk</a>
   </div>
 </div>
+
+<p class="cap-banner"><b>KIOSK CAPTURER</b> · mode ambil data: setiap botol disimpan (frame diam + CSV) dengan label kelompok di bawah. Poin hanya tampil, tidak bisa diklaim.</p>
 
 <div class="grid">
   <div class="stack">
@@ -51,6 +71,28 @@
         <button class="btn" id="bEnd" type="button">Akhiri sesi</button>
         <span class="err" id="msg" style="color:#9a2d12;font-weight:600"></span>
       </div>
+    </section>
+    <section class="panel" id="capPanel" hidden>
+      <h2>Label kelompok <span class="chip chip-lime">kiosk capturer</span></h2>
+      <p class="flab">Isi semua botol berikutnya</p>
+      <div class="seg" id="segIsi"></div>
+      <p class="flab">Tutup</p>
+      <div class="seg" id="segTutup"></div>
+      <div class="fields">
+        <input id="kProduk" placeholder="produk, mis. Aqua 600 / campur merek" autocomplete="off">
+        <input id="kMl" placeholder="ml (opsional)" inputmode="numeric" autocomplete="off">
+      </div>
+      <input class="cat" id="kCat" placeholder="catatan (opsional), mis. isi setengah, label penuh, lampu jendela" autocomplete="off">
+      <div class="row" style="margin-top:10px">
+        <button class="btn btn-lime" id="bKel" type="button">Mulai kelompok ini</button>
+        <span class="err" id="kMsg" style="color:#9a2d12;font-weight:600"></span>
+      </div>
+      <div class="cur" id="kCur"></div>
+      <div class="scroll" style="margin-top:10px"><table>
+        <thead><tr><th>botol</th><th>waktu</th><th>model aktif</th><th>kandidat</th><th>p_cairan</th><th>ukuran</th></tr></thead>
+        <tbody id="kBeda"></tbody>
+      </table></div>
+      <p class="note" id="kNote"></p>
     </section>
     <section class="panel" id="simPanel" hidden>
       <h2>Simulasi</h2>
@@ -89,10 +131,45 @@
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var t = function (ts) { return ts ? new Date(ts * 1000).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'; };
-  var sim = false, auto = false, active = null;
+  var sim = false, auto = false, active = null, capBuilt = false;
+  var ISI = { kosong: 'Kosong', air_bening: 'Air bening', berwarna: 'Berwarna', campur: 'Campur', bukan_botol: 'Bukan botol' };
+  var TUTUP = { tanpa: 'Tanpa tutup', bertutup: 'Bertutup', campur: 'Campur' };
+  var HAR = { terima: 'DITERIMA', tolak: 'DITOLAK', tidak_terdeteksi: 'TIDAK TERPINDAI (bukan botol)', '': 'tidak bisa diharapkan (campur)' };
+  function seg(id, name, keys, labels) {
+    $(id).innerHTML = keys.map(function (k, i) {
+      return '<label><input type="radio" name="' + name + '" value="' + k + '"' + (i === 0 ? ' checked' : '') + '><span>' + esc(labels[k] || k) + '</span></label>';
+    }).join('');
+  }
+  function pick(name) { var x = document.querySelector('input[name="' + name + '"]:checked'); return x ? x.value : ''; }
+  function capRender(c) {
+    document.body.classList.toggle('capturer', !!c.aktif);
+    $('capPanel').hidden = !c.aktif;
+    if (!c.aktif) return;
+    if (!capBuilt) { seg('segIsi', 'isi', c.isi, ISI); seg('segTutup', 'tutup', c.tutup, TUTUP); capBuilt = true; }
+    var k = c.kelompok;
+    if (!k) {
+      $('kCur').innerHTML = '<span class="big">Belum ada kelompok.</span> Pilih isi dan tutup lalu tekan <b>Mulai kelompok ini</b> sebelum memasukkan botol. Botol tanpa kelompok tetap disimpan, tetapi tanpa label.';
+      $('kBeda').innerHTML = '';
+    } else {
+      var pct = function (a, n) { return n ? a + '/' + n : '-'; };
+      $('kCur').innerHTML = '<span class="big">' + esc(k.id) + ' · ' + esc(ISI[k.isi] || k.isi) + ' · ' + esc(TUTUP[k.tutup] || k.tutup) +
+        (k.produk ? ' · ' + esc(k.produk) : '') + (k.ml ? ' · ' + esc(k.ml) + ' ml' : '') + '</span><br>Seharusnya: <b>' + esc(HAR[k.harapan] || k.harapan) + '</b>' +
+        (k.catatan ? ' · <i>' + esc(k.catatan) + '</i>' : '') +
+        '<div class="cnt"><div><b>' + k.n + '</b><span>terpindai</span></div><div><b>' + pct(k.cocok, k.harapan ? k.n : 0) + '</b><span>model aktif sesuai</span></div>' +
+        (c.kandidat ? '<div><b>' + pct(k.cocok_k, k.n_k) + '</b><span>kandidat sesuai</span></div>' : '') +
+        '<div><b>' + k.beda.length + (k.beda.length >= 10 ? '+' : '') + '</b><span>beda (cek di lembar cek)</span></div></div>';
+      $('kBeda').innerHTML = k.beda.length ? k.beda.map(function (b) {
+        return '<tr><td>' + b.botol + '</td><td class="mono">' + esc(b.waktu) + '</td><td>' + esc(b.aktif) + '</td><td>' + esc(b.kandidat || '-') + '</td><td>' +
+          (b.p_cairan != null ? Number(b.p_cairan).toFixed(2) : '-') + '</td><td>' + esc(b.ukuran) + '</td></tr>';
+      }).join('') : '<tr><td colspan="6" style="color:var(--muted)">Belum ada botol yang berbeda dari label kelompok.</td></tr>';
+    }
+    $('kNote').innerHTML = 'Data: <span class="mono">' + esc(c.folder.replace('{tanggal}', new Date().toISOString().slice(0, 10))) +
+      '</span> (SCAN.csv, KELOMPOK.csv, frame PNG). Cek cepat sesudahnya: <span class="mono">python scripts/alat/lembar_cek.py --dir ... --beda</span>';
+  }
   function load() {
     api('/api/operator').then(function (d) {
       var m = d.mesin; sim = m.sim; auto = !!m.auto;
+      if (d.capturer) capRender(d.capturer);
       $('st').innerHTML = '<span class="dot' + (m.status === 'siap' ? '' : ' off') + '"></span>' + esc(m.status) + (m.sesi_aktif ? ' · sesi berjalan' : '');
       $('fps').textContent = m.fps + ' fps';
       $('simPanel').hidden = !sim; $('bAuto').className = 'btn ' + (auto ? 'btn-lime' : 'btn-ghost');
@@ -120,6 +197,11 @@
   $('bStart').onclick = function () { say(api('/api/sesi/mulai', {})); };
   $('bEnd').onclick = function () { say(api('/api/sesi/selesai', {})); };
   $('bAuto').onclick = function () { say(api('/api/sim/auto', { on: !auto })); };
+  $('bKel').onclick = function () {
+    $('kMsg').textContent = '';
+    api('/api/kelompok', { isi: pick('isi'), tutup: pick('tutup'), produk: $('kProduk').value, ml: $('kMl').value, catatan: $('kCat').value })
+      .then(load).catch(function (e) { $('kMsg').textContent = e.message; });
+  };
   document.querySelectorAll('[data-sim]').forEach(function (b) { b.onclick = function () { say(api('/api/sim/botol', JSON.parse(b.getAttribute('data-sim')))); }; });
   load(); setInterval(load, 2000);
 })();

@@ -40,6 +40,7 @@
   var STATUS_TEXT = { siap: 'Mesin siap', memuat: 'Menyiapkan mesin', galat_kamera: 'Kamera bermasalah', galat_model: 'Model gagal dimuat' };
   function setMachine(m) {
     S.machine = m; S.sim = !!m.sim;
+    $('capChip').hidden = !m.capturer; document.body.classList.toggle('capturer', !!m.capturer);
     var ok = m.status === 'siap';
     $('machineText').textContent = (STATUS_TEXT[m.status] || m.status) + (m.sim ? ' · simulasi' : '');
     $('machineChip').querySelector('.dot').className = 'dot' + (ok ? '' : ' off');
@@ -102,7 +103,9 @@
     $('ring').classList.toggle('warn', warn);
     var note = $('idleNote');
     note.classList.toggle('warn', warn);
-    note.textContent = warn ? 'Sesi selesai dalam ' + left + ' detik. Masukkan botol lagi untuk lanjut.' : 'Sesi berhenti sendiri bila ' + S.idleMax + ' detik tidak ada botol.';
+    note.textContent = warn ? 'Sesi selesai dalam ' + left + ' detik. Masukkan botol lagi untuk lanjut.'
+      : (S.machine && S.machine.capturer ? 'Kiosk capturer: sesi tetap berjalan sampai ditekan Selesai (berhenti sendiri setelah ' + Math.round(S.idleMax / 60) + ' menit tanpa botol).'
+        : 'Sesi berhenti sendiri bila ' + S.idleMax + ' detik tidak ada botol.');
   }
   var SIZE_ML = { kecil: '≤ 350 ml', tanggung: '351–800 ml', besar: '> 800 ml', '?': 'ukuran tak terbaca' };
   function addTicket(b, quiet) {
@@ -147,9 +150,23 @@
   }
   function campById(id) { return S.camps.filter(function (c) { return c.id === id; })[0]; }
 
+  var ZERO_SUB = null;
   function showSummary(sum) {
     var s = sum.session, c = sum.claim;
     S.claim = c; S.pick = null; S.doneShown = false;
+    if (ZERO_SUB === null) ZERO_SUB = $('zeroSub').textContent;
+    if (sum.capturer) {                          // kiosk capturer: poin hanya ditampilkan, tanpa QR/klaim
+      $('summary').classList.toggle('zero', !s.points);
+      $('sumTitle').textContent = 'Sesi capturer selesai.';
+      $('sumStats').innerHTML = ['<b>' + s.valid + '</b>diterima', '<b>' + s.invalid + '</b>ditolak', '<b>' + (s.valid + s.invalid) + '</b>botol tersimpan sebagai data']
+        .map(function (x) { return '<li>' + x + '</li>'; }).join('');
+      $('zeroSub').textContent = 'Mode kiosk capturer: poin hanya untuk uji alur dan tidak bisa diklaim. Frame & keputusan setiap botol tersimpan bersama label kelompok.';
+      $('sumPts').setAttribute('data-v', 0);
+      show('summary'); setStep('kosong');
+      if (s.points) setTimeout(function () { countUp($('sumPts'), s.points, 1100); }, 250);
+      return;
+    }
+    $('zeroSub').textContent = ZERO_SUB;
     var zero = !s.points || !c;
     $('summary').classList.toggle('zero', zero);
     $('sumTitle').textContent = zero ? (s.invalid ? 'Belum ada botol yang diterima.' : 'Belum ada botol yang masuk.') : (s.valid >= 5 ? 'Luar biasa, terima kasih.' : 'Kerja bagus, terima kasih.');
