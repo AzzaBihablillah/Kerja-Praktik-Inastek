@@ -280,6 +280,18 @@ Data luar TERVALIDASI tidak merusak (T1 = T0), dan menambah botol berisi air ben
 ### L-20 Ukuran dari panjang botol (23 Okt, `scripts/alat/analisis_ukuran.py`)
 26 botol ber-ml (13/16/20 Okt), uji tinggalkan-satu-botol, setelah koreksi user (Sprite Nipis Mint 16 Okt = 390 ml, bukan 250): luas kotak 24/26 (salah: Pristine 400, Isoplus 350), **panjang 25/26** (salah: Cleo galon 1000 yang pendek-gemuk; ditutup aturan luas ≥ 360k = besar), lebar 20/26. Aturan panjang + "luas ≥ 360k = besar" (menutup galon gemuk) tersedia di `rvm_kp` (`SIZE_RULE = "panjang"`, bawaan masih "luas"). Kalibrasi tetap per pemasangan.
 
+### L-21 Definisi baru: berisi APA PUN (air bening juga ditolak) — keputusan user 23 Okt
+Dipicu uji live L-17 (air bening di botol air mineral terdeteksi 5/5). Lingkup 16 Okt (hanya berwarna) diperluas → perlu dikabarkan ke mitra; di TA sebagai temuan. `scripts/pipeline_cairan/s34_berisi_bening.py` (CV 5 fold per kelompok, 351 foto, 33 kelompok, potongan ketat tanpa geser-hue; 26 foto air bening belt dari 5 botol: Mizone, Le Minerale ×2, Cheers ×2, Coca-Cola isi air):
+
+| | B0 data kita (+ air bening belt = berisi) | B1 + data luar tervalidasi |
+|---|---|---|
+| air bening belt terdeteksi (botol ditahan) | **26/26** | 24/26 |
+| cairan berwarna lama | 122/124 | 120/124 |
+| kosong benar | 115/153 | 114/153 |
+| total salah | **42/351** | 47/351 |
+
+Menambah air bening sebagai 'berisi' tidak menurunkan deteksi warna dan tidak menambah salah alarm kosong; data luar tidak membantu pada definisi ini. Keterbatasan: air bening hanya 5 botol, satu sesi, mayoritas bertutup → uji wajib di sesi pembuktian dengan botol air bening TANPA tutup merek lain. Kandidat: `3_model_final/cairan_berisi_kandidat.pt` (`s35_final_berisi.py`, resep RN + air bening, geser-hue). Botol kosong berlabel penuh tetap belum terpecahkan (5/32).
+
 ### L-9 Model final
 `datasets/4_eksperimen/cairan/final/` (belt W16 + C13) dan `final2/` (+ pilot dan 28 foto tambahan). Keduanya tidak punya uji bersih; akurasi = hasil CV di atas. Belum dipasang di server (lingkup Capstone 1).
 
@@ -354,6 +366,7 @@ Peta lengkap dengan proporsi per model: `PETA-DATASET-19-OKT.md`. Temuan utama: 
 - P15 punya confound; hanya dipakai sebagai uji, tidak pernah dilatih.
 - Level isi `seperempat` tidak konsisten (sebagian hampir penuh, sebagian hampir kosong).
 - Belum diuji pada belt bergerak dan di Jetson.
+- **Botol berlabel penuh (rencana batasan, keputusan user 23 Okt — dipakai di TA HANYA bila setelah latih ulang dengan data tambahan masih gagal):** dibedakan dua jenis. (1) Label penuh dengan celah bening (leher/bahu/pantat; Minute Maid, Isoplus, Mizone): cairan masih terlihat lewat celah → diperbaiki dengan data berpasangan berisi/kosong botol yang sama di belt (Isoplus kosong 1/8 → 7/8 dengan data 22 Okt). (2) Label penuh TANPA celah (mis. Oi Ocha): isi secara fisik tidak terlihat kamera mana pun → rumusan batasan: "kamera tidak dapat menentukan isi botol berlabel penuh tanpa celah; kategori ini memerlukan sensor berat (load cell) atau ditolak". Opsi sistem hibrida (kamera utama, sensor berat hanya saat kamera ragu) = keputusan mitra. Botol berlabel penuh TIDAK ditolak semua karena banyak produk mitra (Minute Maid, Nutriboost, Fanta) termasuk jenis (1). Untuk demo, mitra memilih botol.
 - Model tutup: tutup hitam sudah dilatih (C-10, v2) tetapi baru 2 produk bertutup hitam (Coke Zero, Powerade); Powerade masih 17/20 (tutup sport lebar). Semua uji = foto statis.
 - Hasil "tidak membantu" untuk data luar berlaku untuk resep dan data yang dicoba, bukan bukti umum.
 

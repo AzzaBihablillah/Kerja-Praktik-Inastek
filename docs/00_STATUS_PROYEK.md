@@ -35,6 +35,7 @@ Rincian percobaan dan angka: `docs/CATATAN-PERCOBAAN-TA.md`. Riwayat dan keputus
 | merek | `export_model/brand_best_ver5` (tim) | menerima BIG Cola/BIG Strawberry/Vit sebagai coca_cola; Sprite Nipis Mint luput | belum dikerjakan ulang |
 
 **Kelemahan yang masih ada:**
+- (0) **Botol berlabel penuh**: jenis dengan celah bening → diperbaiki dengan data (sesi pembuktian bagian C); jenis TANPA celah → batasan fisik kamera, ditulis di TA sebagai batasan (perlu sensor berat/ditolak) HANYA bila latih ulang tetap gagal (CATATAN bagian 8).
 - (a) Botol **kosong berlabel penuh berwarna** (Minute Maid, Isoplus) terbaca berisi.
 - (b) Ambang cairan perlu dikalibrasi saat pemasangan (skor RH jenuh mendekati 1).
 - (c) Data uji kecil (21 botol berwarna, 2 sesi).

@@ -2,7 +2,7 @@
 
 **Tujuan:** membuktikan di HARI LAIN dengan BENDA BARU bahwa perbaikan 22–23 Okt bertahan (bukan hanya cocok dengan sesi 22 Okt), dan mengumpulkan data kelemahan yang tersisa. Hasil sesi ini = angka uji yang sah untuk TA.
 
-Model yang diuji (belum aktif sampai sesi ini lolos): detektor `botol_ver10` (CV per benda 22 Okt: non-botol 0/79, botol 154/154), gabungan cairan RH+RN, ukuran berbasis panjang.
+Model yang diuji (belum aktif sampai sesi ini lolos): detektor `botol_ver10` (CV per benda 22 Okt: non-botol 0/79, botol 154/154), cairan `cairan_berisi_kandidat` (definisi baru: air bening juga ditolak) dibanding RH, ukuran berbasis panjang.
 
 ## Cara (semua lewat aplikasi kiosk, mode berhenti-lalu-pindai, frame diam otomatis tersimpan)
 1. Pastikan area belt aman, lalu minta Claude menjalankan aplikasi dengan model kandidat (`--plc`, jeda 1,0 s).
@@ -18,8 +18,7 @@ Model yang diuji (belum aktif sampai sesi ini lolos): detektor `botol_ver10` (CV
 | C. Botol kosong tanpa tutup | 10 botol berbeda, termasuk **berlabel penuh** (Minute Maid, Mizone, Nutriboost, Teh Pucuk, Isoplus) | 15 | kelemahan terbesar model cairan |
 | D. Botol berisi berwarna tanpa tutup | warna **pucat** (oren encer, teh, kuning muda) dan pekat; isi ulang botol bekas boleh | 10 | Fanta oren pucat kemarin lolos |
 | E. Ukuran | botol ramping 400 ml, 1–1,5 L, galon kecil, 250–330 ml (tulis ml-nya) | 5 | uji aturan ukuran panjang vs luas |
-
-Opsional: botol berisi **air bening tanpa tutup** (3–4 merek berbeda) — hanya untuk mencatat temuan, air bening tetap di luar lingkup.
+| F. **Air bening (WAJIB, keputusan 23 Okt: ditolak)** | botol berisi air bening **TANPA tutup**, merek lain dari sebelumnya (Aqua, Club, Vit, Le Minerale besar, botol soda isi air), penuh & setengah | 10 | uji kandidat `cairan_berisi`; lingkup baru perlu dikabarkan ke mitra |
 
 ## Setelah sesi
 Claude: hitung per bagian (diterima/ditolak benar), bandingkan dengan model lama, catat di `CATATAN-PERCOBAAN-TA.md`, lalu (bila lolos) usulkan mengaktifkan `ver10` / gabungan cairan / ukuran panjang. Frame berlabel juga jadi data latih berikutnya.
