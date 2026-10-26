@@ -349,6 +349,7 @@ class SimIn(BaseModel):
     size: Optional[str] = None
     cap: bool = False
     liquid: bool = False
+    benda: bool = False
 
 
 class AutoIn(BaseModel):
@@ -379,7 +380,7 @@ def operator():
     rows = db.q("SELECT b.*, s.started FROM bottles b LEFT JOIN sessions s ON s.id=b.session_id ORDER BY b.id DESC LIMIT 40")
     sess = db.q("SELECT * FROM sessions ORDER BY id DESC LIMIT 10")
     claims = db.q("SELECT code, points, status, created, expires FROM claims ORDER BY created DESC LIMIT 10")
-    return dict(mesin=machine.machine_status(), plc=conveyor.status(), timings=getattr(machine.an, "last_timings", {}),
+    return dict(mesin=machine.machine_status(), plc=conveyor.status(), sortir=machine.sortir.status(), timings=getattr(machine.an, "last_timings", {}),
                 botol=rows, sesi=sess, klaim=claims, stats=db.stats(), url_publik=base_url(),
                 aturan=dict(zona=config.ZONE_X, min_suara=config.MIN_VOTES, nocap_frac=config.NOCAP_FRAC,
                             idle=config.IDLE_TIMEOUT, poin=config.POINTS_BY_SIZE),
@@ -393,7 +394,7 @@ def sim_botol(body: SimIn):
         raise AppError("Hanya tersedia di mode simulasi (--sim).", 400)
     if body.size not in (None, "kecil", "tanggung", "besar"):
         raise AppError("Ukuran tidak dikenal.")
-    machine.an.spawn(body.size, body.cap, body.liquid)
+    machine.an.spawn(body.size, body.cap, body.liquid, body.benda)
     return dict(ok=True)
 
 

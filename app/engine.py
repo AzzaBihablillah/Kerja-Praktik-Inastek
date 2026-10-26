@@ -13,7 +13,8 @@ import traceback
 import cv2
 
 from . import config
-from .tracker import Tracker, decide, iou, center
+from .tracker import Tracker, decide, decide_foreign, iou, center
+from .sortir import Sortir
 
 LIME = (50, 230, 196)       # BGR, sama dengan --lime di CSS
 CORAL = (64, 96, 232)
@@ -79,6 +80,9 @@ class Machine:
         rc = load_rvm_config()
         self.liquid_thr = rc.LIQUID_THR
         self.tracker = Tracker()
+        self.tracker2 = Tracker()           # benda BUKAN botol (kelas non_bottle)
+        self.hold = None                    # benda asing ditahan: belt berhenti sampai diambil
+        self.sortir = Sortir(conveyor, sim=sim)   # penjadwal penyapu V terima/buang (servo tim; kini dicatat)
         self.lock = threading.RLock()
         self.src = self.an = None
         self.status = "memuat"              # memuat | siap | galat_kamera | galat_model
@@ -96,9 +100,11 @@ class Machine:
     # ------------------------------------------------------------------ siklus hidup
     def start(self):
         self._t.start()
+        self.sortir.start()
 
     def stop(self):
         self._stop.set(); self._t.join(timeout=3)
+        self.sortir.stop()
         if self.session:
             self.end_session("server_berhenti")
         try:
@@ -180,7 +186,20 @@ class Machine:
             if active:
                 results = self.an.analyze(frame)
                 done = self.tracker.update(results, frame.shape[1], now)
-                if config.STOP_SCAN and not self.sim:
+                fr = self._foreign_results(results) if config.FOREIGN_ENABLE else []
+                done2 = self.tracker2.update(fr, frame.shape[1], now)
+                if self.hold is not None:
+                    self._hold_step(fr, frame.shape[1], now)
+                elif config.STOP_SCAN and not self.sim and config.FOREIGN_ENABLE:
+                    t2 = self._stop_candidate(frame.shape[1], now, self.tracker2)
+                    if t2 is not None and self._stop_candidate(frame.shape[1], now) is None:
+                        b = self._stop_and_scan_foreign(t2)
+                        if b is not None:
+                            with self.lock:
+                                if self.session is not None:
+                                    self.session["last_seen"] = time.time(); self._record(b)
+                        now = time.time()
+                if self.hold is None and config.STOP_SCAN and not self.sim:
                     t = self._stop_candidate(frame.shape[1], now)
                     if t is not None:
                         b = self._stop_and_scan(t)
@@ -195,6 +214,9 @@ class Machine:
                             self.session["last_seen"] = now
                         for t in done:
                             self._record(decide(t, self.liquid_thr))
+                        for t in done2:                             # tanpa berhenti-lalu-pindai (sim / --terus)
+                            if not getattr(t, "scanned", False):
+                                self._record(decide_foreign(t, len(t.votes)))
             dt = now - t_prev; t_prev = now
             self.fps = 0.8 * self.fps + 0.2 * (1.0 / dt if dt > 0 else 0)
             if now - t_prev_preview >= 1.0 / (config.PREVIEW_FPS if active else 4):
@@ -214,10 +236,10 @@ class Machine:
                 time.sleep(0.05)
 
     # ------------------------------------------------------------------ berhenti-lalu-pindai
-    def _stop_candidate(self, width, now):
-        """Botol (terlihat di frame ini) yang belum dipindai dan pusatnya masuk zona pemicu."""
+    def _stop_candidate(self, width, now, tracker=None):
+        """Botol/benda (terlihat di frame ini) yang belum dipindai dan pusatnya masuk zona pemicu."""
         z0, z1 = config.STOP_ZONE_X[0] * width, config.STOP_ZONE_X[1] * width
-        for t in self.tracker.tracks:
+        for t in (tracker or self.tracker).tracks:
             if t.decided or getattr(t, "scanned", False) or t.last < now:
                 continue
             if z0 <= center(t.box)[0] <= z1:
@@ -257,6 +279,62 @@ class Machine:
         if self.an2 is not None:
             self._shadow(t, frames, plc_ok, b)
         return b
+
+    # ------------------------------------------------------------------ benda bukan botol
+    def _foreign_results(self, results):
+        """Kotak non_bottle frame ini yang tidak menumpang kotak botol."""
+        nb = getattr(self.an, "last_nonbottle", None) or []
+        return [r for r in nb if all(iou(r.box, b.box) < config.FOREIGN_IOU_BOTTLE for b in results)]
+
+    def _stop_and_scan_foreign(self, t):
+        """Benda asing masuk zona: berhenti, ambil frame diam. Bila ternyata botol -> serahkan ke alur botol (None).
+        Bila tetap bukan botol -> keputusan tolak 'bukan_botol'; belt tetap berhenti sampai bendanya diambil (bila FOREIGN_WAIT_CLEAR)."""
+        t.scanned = True; t0 = time.time()
+        plc_ok = self.conveyor.run(False) if self.conveyor.enabled else None
+        self._stop.wait(config.STOP_SETTLE_SEC)
+        frames = []; hits = []; bottle = False
+        for _ in range(config.STOP_FRAMES):
+            if self._stop.is_set() or self.session is None or time.time() - t0 > config.STOP_MAX_SEC:
+                break
+            f = self.src.read(); res = self.an.analyze(f); frames.append(f)
+            if any(iou(r.box, t.box) >= 0.2 for r in res):
+                bottle = True
+            hits += [r for r in self._foreign_results(res) if iou(r.box, t.box) >= 0.2]
+            self._preview(f, True)
+        t_scan = time.time() - t0
+        if bottle or not hits:                                      # ternyata botol / benda hilang: jalan lagi, alur biasa
+            if self.conveyor.enabled and self.session is not None:
+                self.conveyor.run(True)
+            print("[asing] #%d dibatalkan (%s)" % (t.id, "ternyata botol" if bottle else "tidak terlihat saat diam"), flush=True)
+            return None
+        t.decided = True
+        b = decide_foreign(t, len(frames)); b["mode"] = "berhenti"; b["stop_sec"] = round(t_scan, 2)
+        b["conf_non_botol"] = round(max(r.conf for r in hits), 3)
+        self._tag(b)
+        self._save_scan(t, b, frames, hits)
+        if config.FOREIGN_WAIT_CLEAR:
+            self.hold = dict(box=hits[-1].box, since=time.time(), clear=None, id=t.id)
+            print("[asing] #%d bukan botol (conf %.2f): belt DITAHAN sampai benda diambil" % (t.id, b["conf_non_botol"]), flush=True)
+        elif self.conveyor.enabled and self.session is not None:
+            self.conveyor.run(True)
+        return b
+
+    def _hold_step(self, fr, width, now):
+        """Belt ditahan karena benda asing: jalan lagi setelah tidak ada benda asing di zona selama HOLD_CLEAR_SEC."""
+        z0, z1 = config.ZONE_X[0] * width, config.ZONE_X[1] * width
+        seen = any(z0 <= center(r.box)[0] <= z1 for r in fr)
+        h = self.hold
+        if h is None:
+            return
+        if seen:
+            h["clear"] = None
+        elif h["clear"] is None:
+            h["clear"] = now
+        elif now - h["clear"] >= config.HOLD_CLEAR_SEC:
+            self.hold = None
+            if self.conveyor.enabled and self.session is not None:
+                self.conveyor.run(True)
+            print("[asing] #%d sudah diambil, belt jalan lagi (ditahan %.0f s)" % (h["id"], now - h["since"]), flush=True)
 
     def _shadow(self, t, frames, plc_ok, b=None):
         """Model kandidat menilai frame diam yang sama; hasil hanya dicatat (SCAN_KANDIDAT.csv), tidak memengaruhi layar/poin."""
@@ -324,6 +402,13 @@ class Machine:
             z0, z1 = int(config.ZONE_X[0] * w), int(config.ZONE_X[1] * w)
             for x in (z0, z1):
                 cv2.line(f, (x, 0), (x, h), (200, 210, 200), 2, cv2.LINE_AA)
+            for t in self.tracker2.tracks:
+                x1, y1, x2, y2 = [int(v) for v in t.box]
+                cv2.rectangle(f, (x1, y1), (x2, y2), CORAL, 4, cv2.LINE_AA)
+                lab = "#%d BUKAN BOTOL%s" % (t.id, " - AMBIL" if self.hold else "")
+                (tw, th), _ = cv2.getTextSize(lab, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
+                cv2.rectangle(f, (x1, max(0, y1 - th - 16)), (x1 + tw + 16, max(th + 16, y1)), CORAL, -1)
+                cv2.putText(f, lab, (x1 + 8, max(th + 8, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, INK, 2, cv2.LINE_AA)
             for t in self.tracker.tracks:
                 r = t.cur; x1, y1, x2, y2 = [int(v) for v in r.box]
                 bad = r.cap == "tutup" or r.p_liquid >= self.liquid_thr
@@ -345,6 +430,7 @@ class Machine:
         s = self.session
         if config.DATA_MODE:
             self._count(b)
+        self.sortir.keputusan(b)
         self.db.bottle_add(s["id"], b)
         s["bottles"].append(b)
         if b["decision"] == "terima":
@@ -390,7 +476,9 @@ class Machine:
         k = self.batch
         b["kelompok"] = k["id"] if k else ""
         b["harapan"] = k["harapan"] if k else ""
-        b["cocok"] = "" if not b["harapan"] else ("ya" if b["decision"] == b["harapan"] else "tidak")
+        h = b["harapan"]
+        ok = (b.get("reason") == "bukan_botol") if h == "bukan_botol" else (b["decision"] == h)
+        b["cocok"] = "" if not h else ("ya" if ok else "tidak")
 
     def _count(self, b):
         self._tag(b)
@@ -423,7 +511,7 @@ class Machine:
                 return None, "Sesi sudah berjalan."
             sid = self.db.session_start(capturer=config.DATA_MODE); now = time.time()
             self.session = dict(id=sid, started=now, last_seen=now, points=0, valid=0, invalid=0, grams=0, bottles=[])
-            self.tracker.reset()
+            self.tracker.reset(); self.tracker2.reset(); self.hold = None
             self.last_summary = None
         self.conveyor.run(True)
         self.emit(dict(type="session_start", session=self.session_public(), idle_max=config.IDLE_TIMEOUT))
@@ -435,7 +523,7 @@ class Machine:
                 return None
             for t in self.tracker.flush():
                 self._record(decide(t, self.liquid_thr))
-            s = self.session; self.session = None
+            s = self.session; self.session = None; self.hold = None
         self.conveyor.run(False)
         row, claim = self.db.session_end(s["id"], ("capturer_" + reason) if config.DATA_MODE else reason, make_claim=not config.DATA_MODE)
         self.last_summary = dict(session=dict(id=s["id"], points=row["points"], valid=row["valid"], invalid=row["invalid"],
@@ -450,4 +538,4 @@ class Machine:
     def machine_status(self):
         return dict(status=self.status, pesan=self.status_msg, sim=self.sim, backend="simulasi" if self.sim else self.backend,
                     profil=self.profile, kamera=self.cam_index, fps=round(self.fps, 1), ambang_cairan=self.liquid_thr,
-                    sesi_aktif=self.session is not None, capturer=config.DATA_MODE, auto=getattr(self.an, "auto", None) if self.sim else None)
+                    sesi_aktif=self.session is not None, capturer=config.DATA_MODE, belt_ditahan=self.hold is not None, auto=getattr(self.an, "auto", None) if self.sim else None)

@@ -27,6 +27,13 @@ Opsi lain: `--profil laptop`, `--port 8000`, `--url http://192.168.0.20:8000` (a
 
 Mode simulasi: tombol di bar atas layar sesi, atau tombol keyboard `1` kecil, `2` tanggung, `3` besar, `4` bertutup, `5` berisi, `A` otomatis.
 
+## Benda bukan botol & jalur terima/tolak (26 Okt)
+- Detektor punya kelas `non_bottle`. Kotak `non_bottle` yang masuk zona dan tidak menumpang kotak botol = **benda asing**: belt berhenti, frame diam disimpan (SCAN.csv alasan `bukan_botol`), layar "Bukan botol PET – ambil kembali bendanya". Belt **ditahan** sampai benda tidak terlihat lagi di zona selama `HOLD_CLEAR_SEC` (default 1,5 s), lalu jalan lagi (`app/config.py`: `FOREIGN_*`).
+- **Penyapu V (servo tim) — `app/sortir.py`.** V terbalik di atas ujung belt melempar benda ke wadah TERIMA/BUANG. Tanpa sensor tambahan, jadi GAGAL-AMAN: (1) **sapuan BUANG berkala** tiap `SORTIR_BUANG_EVERY` detik belt jalan -> benda apa pun di bawah V (termasuk yang tak terdeteksi kamera) terbuang; (2) **sapuan TERIMA terjadwal** untuk botol yang diterima, `SORTIR_TRAVEL_SEC` detik belt jalan setelah keputusannya; sapuan berkala ditunda dalam +-`SORTIR_GUARD_SEC` dari botol itu; (3) benda ditolak juga dijadwalkan ke BUANG. Waktu dihitung sebagai **detik belt berjalan** (saat berhenti untuk pindai/menunggu, jam ikut berhenti). Panel `/operator` → "Penyapu V" (posisi, antrean, jumlah sapuan); tiap sapuan bertiket dicatat di `SORTIR.csv`. Perintah servo di `Sortir._kirim()`: kini dicatat; isi `SORTIR_SERIAL` (env `RVM_SORTIR_SERIAL`, mis. `COM5`) untuk mengirim protokol USULAN `T`/`B`/`N` + newline (sesuaikan firmware tim). Setelah penyapu terpasang, set `FOREIGN_WAIT_CLEAR = False`.
+- **Kalibrasi di mesin:** `SORTIR_TRAVEL_SEC` (stopwatch: dari belt jalan lagi setelah pindai sampai botol tepat di bawah V); `SORTIR_BUANG_EVERY` < panjang V searah belt ÷ kecepatan belt; dua benda harus berjarak > `SORTIR_GUARD_SEC` di belt.
+- Uji offline (foto 22 Okt, `rvm_kp/analyzer.last_nonbottle` + ver9c): 86 non-botol -> 41 ditolak 'bukan botol' (belt ditahan, jalan lagi setelah diambil), 30 dikira botol tetapi tertolak di pemeriksaan tutup/isi (sebagian besar 'leher'), 15 tidak memicu apa pun; 94 foto botol: 0 salah ditahan. Detektor kandidat ver10 TIDAK mengeluarkan `non_bottle` (dilatih sebagai latar) -> jalur ini hanya bekerja dengan ver9c.
+- Simulasi: tombol / tombol keyboard `6` "Bukan botol".
+
 ## Kiosk capturer (`--ambil-data`): demo sekaligus pengumpul data
 ```bash
 venv/Scripts/python.exe -m app --backend pytorch --cam 1 --plc --jeda 1.0 --kandidat --ambil-data

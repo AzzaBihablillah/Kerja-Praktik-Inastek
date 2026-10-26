@@ -43,6 +43,31 @@ STOP_MAX_SEC = 4.0           # pengaman: konveyor dijalankan lagi paling lambat 
 # Simpan frame diam tiap botol (diagnosis + data nyata belt untuk latih ulang). Kosong = tidak menyimpan.
 SCAN_SAVE_DIR = os.path.join(REPO, "datasets", "1_foto_mentah", "{tanggal}_scan_app")
 
+# ---- benda BUKAN botol (26 Okt) ----
+# Kotak kelas non_bottle dari detektor (ver9c) yang masuk zona & tidak menumpang kotak botol = benda asing.
+# Uji 22 Okt: muncul di 41/86 foto non-botol, 0/391 foto botol (4 sesi). Berhenti-lalu-pindai: belt berhenti, frame diam
+# disimpan, keputusan "tolak: bukan botol". Belt TETAP berhenti sampai bendanya diambil (selama belum ada jalur tolak servo).
+FOREIGN_ENABLE = True
+FOREIGN_IOU_BOTTLE = 0.3     # kotak non_bottle yang menumpang kotak botol (IoU >= ini) diabaikan
+FOREIGN_WAIT_CLEAR = True    # True: tunggu benda diambil tangan; False: langsung jalan (bila servo jalur tolak sudah terpasang)
+HOLD_CLEAR_SEC = 1.5         # benda dianggap sudah diambil bila tidak terlihat di zona selama ini
+
+# ---- PENYAPU V di ujung belt (servo tim, 26 Okt) -> app/sortir.py ----
+# Gagal-aman tanpa sensor tambahan: sapuan BUANG berkala + sapuan TERIMA terjadwal untuk botol yang diterima.
+# Semua dalam DETIK BELT BERJALAN (berhenti tidak dihitung). KALIBRASI di mesin dengan SORTIR.csv:
+#   SORTIR_TRAVEL_SEC  = waktu dari keputusan sampai botol tepat di bawah V (ukur: stopwatch dari belt jalan lagi setelah pindai)
+#   SORTIR_BUANG_EVERY = harus < (panjang V searah belt / kecepatan belt), agar tiap benda pasti kena satu sapuan
+SORTIR_ENABLE = True
+SORTIR_TRAVEL_SEC = 4.0
+SORTIR_BUANG_EVERY = 1.5
+SORTIR_BUANG_PERIODIK = True # False = hanya sapuan terjadwal (benda tak terdeteksi TIDAK terbuang otomatis)
+SORTIR_BUANG_TIKET = True    # benda yang ditolak juga dijadwalkan disapu ke BUANG saat tiba
+SORTIR_GUARD_SEC = 0.8       # tidak ada sapuan buang berkala dalam +-ini dari jadwal botol diterima
+SORTIR_SWEEP_SEC = 0.5       # lama V di sisi (servo bergerak + benda terlempar) sebelum kembali ke tengah
+SORTIR_LOG_BERKALA = False   # catat juga tiap sapuan buang berkala (konsol + SORTIR.csv); bawaan: hanya sapuan bertiket, berkala dihitung di panel
+SORTIR_SERIAL = os.environ.get("RVM_SORTIR_SERIAL", "")   # mis. "COM5" (laptop) / "/dev/ttyUSB0" (Nano); kosong = hanya dicatat
+SORTIR_BAUD = 115200
+
 # ---- model KANDIDAT bayangan (sesi pembuktian, 23 Okt) ----
 # Bila aktif (`--kandidat`), setiap botol yang dipindai saat berhenti juga dinilai model kandidat pada FRAME DIAM YANG SAMA.
 # Keputusan di layar & poin TETAP dari model aktif; keputusan kandidat hanya dicatat ke <scan>/SCAN_KANDIDAT.csv untuk dibandingkan.
@@ -68,7 +93,7 @@ def harapan_kelompok(isi, tutup):
     """Keputusan yang SEHARUSNYA untuk label kelompok (kebijakan 23 Okt: berisi apa pun, termasuk air bening, ditolak).
     '' = tidak bisa diharapkan (campur). bukan_botol: seharusnya tidak terpindai sama sekali."""
     if isi == "bukan_botol":
-        return "tidak_terdeteksi"
+        return "bukan_botol"                                   # seharusnya ditolak dengan alasan 'bukan_botol' 
     if tutup == "bertutup" or isi in ("air_bening", "berwarna"):
         return "tolak"
     if isi == "kosong" and tutup == "tanpa":

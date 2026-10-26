@@ -13,6 +13,7 @@ REASONS = {
     "cairan": ("Masih ada isinya", "Habiskan atau buang isinya dulu, lalu masukkan lagi."),
     "tutup_cairan": ("Masih bertutup dan masih ada isinya", "Habiskan atau buang isinya, lepas tutupnya, lalu masukkan lagi."),
     "leher": ("Leher botol tidak terlihat", "Baringkan botol di belt dengan leher menghadap samping, lalu coba lagi."),
+    "bukan_botol": ("Bukan botol PET", "Ambil kembali bendanya dari belt. Mesin ini hanya menerima botol plastik PET."),
 }
 SIZE_TEXT = {"kecil": "Kecil", "tanggung": "Tanggung", "besar": "Besar", "?": "Ukuran tak terbaca"}
 
@@ -96,6 +97,15 @@ class Tracker:
             t.decided = True
         self.tracks = []
         return done
+
+
+def decide_foreign(track, n_frames=1):
+    """Keputusan untuk benda BUKAN botol (kelas non_bottle detektor): selalu tolak, tanpa poin."""
+    reason = "bukan_botol"
+    out = dict(id=track.id, ts=time.time(), decision="tolak", reason=reason, size="?", size_text="Bukan botol", points=0, grams=0,
+               p_liquid=0.0, cap="?", cap_votes="0/0/0", area=0, n_frames=n_frames)
+    out["reason_text"], out["tip"] = REASONS[reason]
+    return out
 
 
 def decide(track, liquid_thr):

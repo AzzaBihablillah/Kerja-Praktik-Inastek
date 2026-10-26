@@ -134,9 +134,13 @@ class RVMAnalyzer:
             t = time.perf_counter(); rc = self._pred(self.cap, frame, config.IMGSZ_CAP_FULL, config.CONF_CAP)
             T["tutup"] += (time.perf_counter() - t) * 1e3
 
-        out = []
+        out = []; nb = []
         for b in rb.boxes:
-            if int(b.cls) != 0:
+            if int(b.cls) != 0:                                    # non_bottle: disimpan untuk app (benda asing), bukan hasil botol
+                if int(b.cls) == 1:
+                    x1, y1, x2, y2 = [float(v) for v in b.xyxy[0]]
+                    nb.append(BottleResult((x1 / k, y1 / k, x2 / k, y2 / k), float(b.conf), "?", 0.0, 0.0, False, "?",
+                                           (x2 - x1) * (y2 - y1) * (1920 / W) ** 2))
                 continue
             x1, y1, x2, y2 = [float(v) for v in b.xyxy[0]]
             t = time.perf_counter()
@@ -175,6 +179,7 @@ class RVMAnalyzer:
                 size = "kecil" if area < config.AREA_KECIL_TANGGUNG else ("tanggung" if area < config.AREA_TANGGUNG_BESAR else "besar")
             out.append(BottleResult((x1 / k, y1 / k, x2 / k, y2 / k), float(b.conf), cap, cconf, p, p >= self.liquid_thr, size, area))
         T["total"] = sum(T.values())
+        self.last_nonbottle = nb                                    # kotak kelas non_bottle frame ini (koordinat frame masukan)
         for r in out:
             r.timings_ms = T
         self.last_timings = T

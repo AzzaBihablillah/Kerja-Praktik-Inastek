@@ -102,8 +102,15 @@
         <button class="btn btn-quiet" data-sim='{"size":"besar"}' type="button">Besar kosong</button>
         <button class="btn btn-quiet" data-sim='{"size":"tanggung","cap":true}' type="button">Bertutup</button>
         <button class="btn btn-quiet" data-sim='{"size":"besar","liquid":true}' type="button">Berisi cairan</button>
+        <button class="btn btn-quiet" data-sim='{"benda":true}' type="button">Bukan botol</button>
         <button class="btn btn-ghost" id="bAuto" type="button">Otomatis</button>
       </div>
+    </section>
+    <section class="panel">
+      <h2>Penyapu V <span class="chip" id="vPos">-</span></h2>
+      <dl class="kv" id="vKv"></dl>
+      <div class="scroll" style="margin-top:8px"><table><thead><tr><th>botol</th><th>ke</th><th>tiba dalam (s belt)</th></tr></thead><tbody id="vQ"></tbody></table></div>
+      <p class="note">Gagal-aman: sapuan BUANG berkala + sapuan TERIMA terjadwal. Waktu = detik belt berjalan. Kalibrasi di <span class="mono">app/config.py</span> (SORTIR_*), catatan tiap sapuan di SORTIR.csv.</p>
     </section>
     <section class="panel">
       <h2>Mesin</h2>
@@ -134,7 +141,7 @@
   var sim = false, auto = false, active = null, capBuilt = false;
   var ISI = { kosong: 'Kosong', air_bening: 'Air bening', berwarna: 'Berwarna', campur: 'Campur', bukan_botol: 'Bukan botol' };
   var TUTUP = { tanpa: 'Tanpa tutup', bertutup: 'Bertutup', campur: 'Campur' };
-  var HAR = { terima: 'DITERIMA', tolak: 'DITOLAK', tidak_terdeteksi: 'TIDAK TERPINDAI (bukan botol)', '': 'tidak bisa diharapkan (campur)' };
+  var HAR = { terima: 'DITERIMA', tolak: 'DITOLAK', bukan_botol: 'DITOLAK: bukan botol', '': 'tidak bisa diharapkan (campur)' };
   function seg(id, name, keys, labels) {
     $(id).innerHTML = keys.map(function (k, i) {
       return '<label><input type="radio" name="' + name + '" value="' + k + '"' + (i === 0 ? ' checked' : '') + '><span>' + esc(labels[k] || k) + '</span></label>';
@@ -170,6 +177,17 @@
     api('/api/operator').then(function (d) {
       var m = d.mesin; sim = m.sim; auto = !!m.auto;
       if (d.capturer) capRender(d.capturer);
+      if (d.sortir) {
+        var v = d.sortir;
+        $('vPos').textContent = v.aktif ? v.posisi : 'nonaktif';
+        $('vPos').className = 'chip' + (v.posisi === 'TERIMA' ? ' chip-lime' : (v.posisi === 'BUANG' ? ' chip-coral' : ''));
+        $('vKv').innerHTML = [['jam belt', v.jam_belt + ' s'], ['tiba di V', v.tiba_s + ' s'], ['buang berkala tiap', v.berkala ? v.buang_tiap_s + ' s' : 'mati'],
+          ['sapuan terima', v.sapuan.terima], ['buang (tiket)', v.sapuan.buang_tiket], ['buang (berkala)', v.sapuan.buang_berkala], ['serial', v.serial]]
+          .map(function (x) { return '<div><dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd></div>'; }).join('');
+        $('vQ').innerHTML = v.antrean.length ? v.antrean.map(function (q) {
+          return '<tr class="' + (q.jalur === 'TERIMA' ? 'ok' : 'bad') + '"><td>' + esc(q.id) + '</td><td>' + esc(q.jalur) + '</td><td>' + q.tiba_dalam + '</td></tr>';
+        }).join('') : '<tr><td colspan="3" style="color:var(--muted)">Antrean kosong.</td></tr>';
+      }
       $('st').innerHTML = '<span class="dot' + (m.status === 'siap' ? '' : ' off') + '"></span>' + esc(m.status) + (m.sesi_aktif ? ' · sesi berjalan' : '');
       $('fps').textContent = m.fps + ' fps';
       $('simPanel').hidden = !sim; $('bAuto').className = 'btn ' + (auto ? 'btn-lime' : 'btn-ghost');

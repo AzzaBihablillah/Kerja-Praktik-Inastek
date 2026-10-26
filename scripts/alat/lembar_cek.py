@@ -26,7 +26,7 @@ if os.path.exists(f"{D}/SCAN_KANDIDAT.csv"):                 # keputusan model k
     KD = {(k["sesi"], k["botol"], k["waktu"]): k for k in csv.DictReader(open(f"{D}/SCAN_KANDIDAT.csv"))}
 if a.sesi:
     R = [r for r in R if r["sesi"] in a.sesi]
-AL = {"": "DITERIMA", "tutup": "TOLAK: bertutup", "tutup_cairan": "TOLAK: bertutup+berisi", "cairan": "TOLAK: berisi", "leher": "TOLAK: leher?"}
+AL = {"": "DITERIMA", "tutup": "TOLAK: bertutup", "tutup_cairan": "TOLAK: bertutup+berisi", "cairan": "TOLAK: berisi", "leher": "TOLAK: leher?", "bukan_botol": "TOLAK: bukan botol"}
 tiles = []
 ROWS = list(enumerate(R, 1))
 if a.beda:
