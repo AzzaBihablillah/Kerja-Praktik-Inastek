@@ -56,10 +56,10 @@
     clearTimeout(attractTimer);
     api('/api/kiosk').then(function (d) {
       var st = d.stats;
-      var n = $('todayN'); n.classList.remove('sk'); countUp(n, st.botol_hari_ini, 900);
-      $('todaySub').textContent = st.botol_hari_ini
-        ? '≈ ' + gramText(st.gram_hari_ini) + ' plastik tidak berakhir di TPA. Total ' + fmt(st.botol_total) + ' botol sejak mesin dipasang.'
-        : (st.botol_total ? 'Belum ada botol hari ini. Total ' + fmt(st.botol_total) + ' botol sejak mesin dipasang.' : 'Jadilah penyetor pertama hari ini.');
+      var n = $('todayN'); n.classList.remove('sk'); countUp(n, st.botol_bulan_ini, 900);
+      $('todaySub').textContent = st.botol_bulan_ini
+        ? '≈ ' + gramText(st.gram_bulan_ini) + ' plastik tidak berakhir di TPA. Total ' + fmt(st.botol_total) + ' botol sejak mesin dipasang.'
+        : (st.botol_total ? 'Belum ada botol bulan ini. Total ' + fmt(st.botol_total) + ' botol sejak mesin dipasang.' : 'Jadilah penyetor pertama bulan ini.');
       Object.keys(d.poin).forEach(function (k) { var el = document.querySelector('[data-p="' + k + '"]'); if (el) el.textContent = d.poin[k]; });
       S.camps = d.kampanye;
       $('camps').innerHTML = d.kampanye.map(function (c) {
@@ -98,7 +98,7 @@
   function setRing(left) {
     var k = Math.max(0, Math.min(1, left / S.idleMax));
     $('ringFg').style.strokeDashoffset = (175.9 * (1 - k)).toFixed(1);
-    $('ringN').textContent = left;
+    $('ringN').textContent = left >= 100 ? Math.ceil(left / 60) + 'm' : left;   // kiosk capturer (batas 1 jam): menit, agar muat di lingkaran
     var warn = left <= 10;
     $('ring').classList.toggle('warn', warn);
     var note = $('idleNote');
@@ -138,8 +138,12 @@
   /* ---------------- ringkasan: pilih -> (ambil | donasi) -> selesai ---------------- */
   var STEP_SEC = { selesai: 12, kosong: 20, titip: 25 };   // pilih/ambil/donasi memakai S.summarySec, hp memakai S.claimLinkSec
   var CAMP_IC = ['leaf', 'bottle', 'drop'];
+  // Judul ringkasan per langkah (copy dari kanvas Design user, 26 Okt); langkah lain memakai judul awal sesi.
+  var STEP_TITLE = { ambil: 'Terima kasih, Pahlawan Lingkungan!', donasi: 'Terima kasih, Pahlawan Lingkungan!',
+    hp: 'Terima kasih, Pahlawan Lingkungan!', titip: 'Terima kasih, Pahlawan Lingkungan!', selesai: 'Langkah Kecilmu, Napas Baru Bagi Bumi!' };
   function setStep(step) {
     S.step = step; $('summary').setAttribute('data-step', step);
+    if (S.baseTitle) $('sumTitle').textContent = STEP_TITLE[step] || S.baseTitle;
     var b = $('btnDone');
     b.hidden = step === 'pilih' || step === 'donasi';  // dijawab lewat kartu besar; waktu habis = poin dititipkan, bukan didonasikan
     b.textContent = step === 'ambil' ? 'Sudah dipindai' : 'Selesai';
@@ -153,7 +157,7 @@
   var ZERO_SUB = null;
   function showSummary(sum) {
     var s = sum.session, c = sum.claim;
-    S.claim = c; S.pick = null; S.doneShown = false;
+    S.claim = c; S.pick = null; S.doneShown = false; S.baseTitle = '';
     if (ZERO_SUB === null) ZERO_SUB = $('zeroSub').textContent;
     if (sum.capturer) {                          // kiosk capturer: poin hanya ditampilkan, tanpa QR/klaim
       $('summary').classList.toggle('zero', !s.points);
@@ -170,11 +174,12 @@
     var zero = !s.points || !c;
     $('summary').classList.toggle('zero', zero);
     $('sumTitle').textContent = zero ? (s.invalid ? 'Belum ada botol yang diterima.' : 'Belum ada botol yang masuk.') : (s.valid >= 5 ? 'Luar biasa, terima kasih.' : 'Kerja bagus, terima kasih.');
+    if (!zero) S.baseTitle = $('sumTitle').textContent;
     var reasons = {};
     (s.bottles || []).forEach(function (b) { if (b.reason) reasons[b.reason] = (reasons[b.reason] || 0) + 1; });
     var t = (reasons.tutup || 0) + (reasons.tutup_cairan || 0), cr = (reasons.cairan || 0) + (reasons.tutup_cairan || 0);
     var items = ['<b>' + s.valid + '</b>botol diterima', '<b>' + gramText(s.grams) + '</b>plastik terselamatkan'];
-    if (s.invalid) items.push('<b>' + s.invalid + '</b>ditolak' + (t ? ' · ' + t + ' bertutup' : '') + (cr ? ' · ' + cr + ' berisi' : ''));
+    if (s.invalid) items.push('<b>' + s.invalid + '</b>ditolak' + (t ? ' · ' + t + ' bertutup' : '') + (cr ? ' · ' + cr + ' berisi' : '') + (reasons.bukan_botol ? ' · ' + reasons.bukan_botol + ' bukan botol' : ''));
     $('sumStats').innerHTML = items.map(function (x) { return '<li>' + x + '</li>'; }).join('');
     $('sumPts').setAttribute('data-v', 0);
     show('summary');
@@ -245,7 +250,7 @@
     S.doneShown = true;
     var give = kind === 'give', camp = give ? campById(cid) : null;
     var badge = $('doneBadge'); badge.className = 'done-badge' + (give ? ' give' : ''); badge.innerHTML = ic(give ? 'heart' : 'check');
-    $('doneTitle').textContent = give ? 'Terima kasih!' : 'Poin tersimpan.';
+    $('doneTitle').textContent = give ? 'Terima kasih ya!' : 'Poin tersimpan.';
     $('doneSub').textContent = give
       ? fmt(points) + ' poin disalurkan ke ' + (camp ? camp.nama : 'yayasan') + '. Botolmu hari ini ikut membiayai program ini.'
       : fmt(points) + ' poin sudah masuk ke akunmu. Cek saldo dan tukar hadiah dari HP.';
@@ -301,7 +306,7 @@
   });
   document.addEventListener('keydown', function (e) {
     if (!S.sim || S.screen !== 'session') return;
-    var m = { '1': { size: 'kecil' }, '2': { size: 'tanggung' }, '3': { size: 'besar' }, '4': { size: 'tanggung', cap: true }, '5': { size: 'tanggung', liquid: true } }[e.key];
+    var m = { '1': { size: 'kecil' }, '2': { size: 'tanggung' }, '3': { size: 'besar' }, '4': { size: 'tanggung', cap: true }, '5': { size: 'tanggung', liquid: true }, '6': { benda: true } }[e.key];
     if (m) sim(m);
     if (e.key === 'a' || e.key === 'A') $('simAuto').click();
   });

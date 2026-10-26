@@ -9,8 +9,21 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Geist:wght@400..700&family=Geist+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/kiosk.css">
+<script>
+/* Skala panggung 1280x800 agar pas di jendela (tanpa terpotong, proporsi tetap). */
+(function () {
+  var last = '';
+  function fit() {
+    var k = innerWidth + 'x' + innerHeight; if (k === last) return; last = k;
+    document.documentElement.style.setProperty('--s', Math.min(innerWidth / 1280, innerHeight / 800).toFixed(4));
+  }
+  fit(); addEventListener('resize', fit);
+  setInterval(fit, 1000);   // cadangan bila 'resize' terlewat (layar penuh kiosk, emulasi ukuran)
+})();
+</script>
 </head>
 <body data-screen="attract">
+<div id="stage">
 
 <header class="top">
   <div class="brand">
@@ -29,18 +42,16 @@
   <section class="screen attract" id="attract" aria-labelledby="heroTitle">
     <div class="att-left">
       <svg class="hero-bottle" viewBox="0 0 200 420" aria-hidden="true">
-        <path d="M80 10h40v34l18 28v300a28 28 0 0 1-28 28H90a28 28 0 0 1-28-28V72l18-28z" fill="none" stroke="currentColor" stroke-width="3"/>
-        <path d="M62 150h76M62 250h76" stroke="currentColor" stroke-width="3"/>
-        <path d="M76 10h48" stroke="currentColor" stroke-width="9" stroke-linecap="round"/>
+        <path d="M82 48V70C82 94 40 104 40 142V360C40 390 52 404 68 404C76 404 80 396 84 396C88 396 92 404 100 404C108 404 112 396 116 396C120 396 124 404 132 404C148 404 160 390 160 360V142C160 104 118 94 118 70V48" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M74 42h52v6H74zM80 8h40a3 3 0 0 1 3 3v31H77V11a3 3 0 0 1 3-3z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M86 14v22M93 14v22M100 14v22M107 14v22M114 14v22M40 168h120M40 236h120M44 286c34 10 78 10 112 0M44 302c34 10 78 10 112 0" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
       </svg>
       <p class="eyebrow rise" style="animation-delay:.05s">Mesin daur ulang botol PET</p>
-      <h1 class="hero rise" id="heroTitle" style="animation-delay:.12s">Botol kosongmu <span class="hl">masih bernilai.</span></h1>
-      <p class="lede rise" style="animation-delay:.2s">Setor botol plastik, kumpulkan poin, lalu simpan ke akunmu atau donasikan untuk program lingkungan.</p>
+      <h1 class="hero rise" id="heroTitle" style="animation-delay:.12s">Botol kosongmu <span class="hl">masih bernilai!</span></h1>
+      <p class="lede rise" style="animation-delay:.2s">Kumpulkan botol plastikmu, dapatkan poinmu, jadikan uangmu atau donasikan untuk lingkungan yang lebih baik.</p>
 
       <ol class="rules rise" style="animation-delay:.28s">
-        <li><span class="rule-ic" data-ic="cap"></span><div><b>Lepas tutupnya</b><span>Cincin di leher boleh tertinggal</span></div></li>
-        <li><span class="rule-ic" data-ic="drop"></span><div><b>Pastikan kosong</b><span>Botol berisi minuman ditolak</span></div></li>
-        <li><span class="rule-ic" data-ic="lay"></span><div><b>Baringkan di belt</b><span>Satu per satu, leher ke samping</span></div></li>
+        <li><span class="rule-ic" data-ic="cap"></span><div><b>Lepas<br>Tutupnya</b></div></li>
+        <li><span class="rule-ic" data-ic="drop"></span><div><b>Kosongkan Isi-nya</b></div></li>
+        <li><span class="rule-ic" data-ic="lay"></span><div><b>Letakkan dan dapatkan poinnya</b></div></li>
       </ol>
 
       <div class="cta-row rise" style="animation-delay:.36s">
@@ -58,7 +69,7 @@
 
     <aside class="att-panel rise" style="animation-delay:.18s" aria-label="Statistik mesin">
       <div class="panel-block">
-        <p class="eyebrow on-dark">Terkumpul hari ini</p>
+        <p class="eyebrow on-dark">Terkumpul bulan ini</p>
         <div class="today">
           <span class="num today-n sk" id="todayN">00</span>
           <span class="today-unit">botol</span>
@@ -66,7 +77,7 @@
         <p class="today-sub" id="todaySub"><span class="sk">memuat statistik</span></p>
       </div>
       <div class="panel-block">
-        <div class="pb-head"><p class="eyebrow on-dark">Donasi poin</p><span class="chip chip-dark small">simulasi</span></div>
+        <div class="pb-head"><p class="eyebrow on-dark">Donasi poin</p></div>
         <ul class="camps" id="camps">
           <li><span class="sk">memuat</span><div class="bar"><i style="transform:scaleX(.3)"></i></div></li>
           <li><span class="sk">memuat</span><div class="bar"><i style="transform:scaleX(.2)"></i></div></li>
@@ -92,7 +103,7 @@
       <ul class="cam-hints">
         <li><span data-ic="cap"></span>Tanpa tutup</li>
         <li><span data-ic="drop"></span>Kosong</li>
-        <li><span data-ic="lay"></span>Berbaring, satu per satu</li>
+        <li><span data-ic="lay"></span>Masukkan, satu per satu</li>
       </ul>
     </div>
 
@@ -141,13 +152,13 @@
       <div class="big-choices">
         <button class="big-choice self" id="chSelf" type="button">
           <span class="bc-ic" data-ic="wallet"></span>
-          <span class="bc-t"><b>Ambil poin untuk saya</b><span>Pindai QR dengan HP, simpan ke akun, lalu tukar hadiah.</span></span>
-          <span class="bc-go"><span data-ic="phone"></span>Perlu HP<span data-ic="arrow"></span></span>
+          <span class="bc-t"><b>Ambil poin untuk saya</b><span>Pindai QR dengan HP, simpan ke akun, lalu tukar jadi uang.</span></span>
+          <span class="bc-go"><span data-ic="phone"></span>Siapkan HP-mu ya!<span data-ic="arrow"></span></span>
         </button>
         <button class="big-choice give" id="chGive" type="button">
           <span class="bc-ic" data-ic="heart"></span>
           <span class="bc-t"><b>Donasikan ke yayasan</b><span>Salurkan poinmu ke program lingkungan. Langsung dari layar ini.</span></span>
-          <span class="bc-go">Tanpa HP<span data-ic="arrow"></span></span>
+          <span class="bc-go">Lanjutkan<span data-ic="arrow"></span></span>
         </button>
       </div>
     </div>
@@ -242,8 +253,11 @@
   <button type="button" data-sim='{"size":"besar"}'>3 Besar</button>
   <button type="button" data-sim='{"size":"tanggung","cap":true}'>4 Bertutup</button>
   <button type="button" data-sim='{"size":"tanggung","liquid":true}'>5 Berisi</button>
+  <button type="button" data-sim='{"benda":true}'>6 Bukan botol</button>
   <button type="button" id="simAuto">A Otomatis</button>
 </div>
+
+</div><!-- /stage -->
 
 <script src="/static/icons.js"></script>
 <script src="/static/kiosk.js"></script>

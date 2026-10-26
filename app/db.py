@@ -40,15 +40,15 @@ CREATE INDEX IF NOT EXISTS ix_bottles_ts ON bottles(ts);
 
 # Data contoh (simulasi). Kampanye & hadiah BUKAN program nyata; tampil dengan label "simulasi".
 CAMPAIGNS = [
-    ("mangrove", "Mangrove Pesisir Selatan", "Tiap 500 poin = 1 bibit mangrove ditanam di pantai Bantul.", 20000, 6815, 1),
-    ("tong-pilah", "Tong Pilah untuk Sekolah", "Tong sampah terpilah untuk 12 SD negeri di Sleman.", 15000, 3270, 2),
+    ("mangrove", "Mangrove Pesisir Selatan", "Tiap 500 poin = 1 bibit mangrove ditanam di pantai.", 20000, 6815, 1),
+    ("tong-pilah", "Tong Pilah untuk Sekolah", "Tong sampah terpilah untuk 12 SD negeri di Yogyakarta.", 15000, 3270, 2),
     ("sungai-code", "Bersih Sungai Code", "Alat dan konsumsi relawan susur sungai tiap bulan.", 8000, 1945, 3),
 ]
 DEFAULT_CAMPAIGN = "mangrove"   # tujuan poin yang tidak diklaim dalam CLAIM_HOURS
 REWARDS = [
     ("pulsa-5k", "Pulsa Rp5.000", "Voucher pulsa semua operator.", 400, 50, 1),
     ("ewallet-10k", "Saldo e-wallet Rp10.000", "Kode isi ulang dompet digital.", 750, 30, 2),
-    ("tumbler", "Tumbler bambu 450 ml", "Ambil di meja operator.", 1250, 12, 3),
+    ("tumbler", "Tumbler 450 ml", "Ambil di meja operator.", 1250, 12, 3),
     ("tote", "Tote bag kanvas", "Tas belanja dari kanvas daur ulang.", 900, 20, 4),
 ]
 CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"   # tanpa 0/O/1/I agar mudah diketik
@@ -81,8 +81,10 @@ class DB:
             self.c.executescript(SCHEMA)
             for r in CAMPAIGNS:
                 self.c.execute("INSERT OR IGNORE INTO campaigns(slug,nama,ringkas,target,seed_points,sort) VALUES(?,?,?,?,?,?)", r)
+                self.c.execute("UPDATE campaigns SET nama=?, ringkas=? WHERE slug=?", (r[1], r[2], r[0]))   # teks ikut kode; angka tetap
             for r in REWARDS:
                 self.c.execute("INSERT OR IGNORE INTO rewards(slug,nama,ringkas,cost,stok,sort) VALUES(?,?,?,?,?,?)", r)
+                self.c.execute("UPDATE rewards SET nama=?, ringkas=? WHERE slug=?", (r[1], r[2], r[0]))     # stok tidak diubah
 
     # ------------------------------------------------------------------ util
     def q(self, sql, args=()):
@@ -344,7 +346,10 @@ class DB:
         midnight = time.mktime(time.localtime()[:3] + (0, 0, 0, 0, 0, -1))
         tot = self.one("SELECT COUNT(*) n, COALESCE(SUM(grams),0) g, COALESCE(SUM(points),0) p FROM bottles WHERE decision='terima'")
         today = self.one("SELECT COUNT(*) n, COALESCE(SUM(grams),0) g FROM bottles WHERE decision='terima' AND ts>=?", (midnight,))
+        month_start = time.mktime(time.localtime()[:2] + (1, 0, 0, 0, 0, 0, -1))
+        month = self.one("SELECT COUNT(*) n, COALESCE(SUM(grams),0) g FROM bottles WHERE decision='terima' AND ts>=?", (month_start,))
         recent = self.q("SELECT decision, reason, size, points, ts FROM bottles ORDER BY id DESC LIMIT 8")
         users = self.one("SELECT COUNT(*) n FROM users")
         return dict(botol_total=tot["n"], gram_total=tot["g"], poin_total=tot["p"], botol_hari_ini=today["n"],
-                    gram_hari_ini=today["g"], terbaru=recent, pengguna=users["n"])
+                    gram_hari_ini=today["g"], botol_bulan_ini=month["n"], gram_bulan_ini=month["g"],
+                    terbaru=recent, pengguna=users["n"])

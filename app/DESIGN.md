@@ -36,7 +36,7 @@ Teks di atas lime/coral selalu `--ink`. Bayangan diwarnai hijau tinta (`rgba(22,
 - `prefers-reduced-motion` mematikan semuanya.
 
 ## Tata letak
-- Kiosk lanskap tanpa gulir, 1024×600 s.d. 1920×1080; ukuran mengikuti `vh` lewat `clamp()`. Layar ≤ 640 px tinggi menyembunyikan teks sekunder.
+- Kiosk = PANGGUNG TETAP 1280x800 (`#stage`) yang diskalakan utuh agar pas di jendela apa pun (skrip di `<head>` kiosk.html mengisi `--s`); sisa ruang = bingkai krem. Ukuran ditulis dalam px atau `var(--vh)`/`var(--vw)` (1% panggung), JANGAN vh/vw jendela. Alasan: tampilan harus sama persis dengan artboard kanvas 1280x800 di laptop 125% (1536x~820), monitor 1080p, dan layar 1024x600.
 - Layar awal: split 1,55 : 1 (teks kiri, panel statistik gelap kanan). Aturan = daftar bernomor 3 kolom bergaris, bukan 3 kartu.
 - Sesi: kamera 1,5 : 1 sisi; kartu keputusan besar muncul di bawah kamera 2,6 s (diterima) / 4,2 s (ditolak).
 - Ringkasan = alur bertahap (`data-step`): kepala (judul + poin besar) tetap, di bawahnya satu langkah saja:
@@ -61,3 +61,5 @@ Kontras teks ≥ 4.5:1, `:focus-visible` di semua kontrol, label nyata di formul
 2026-10-21 — pembuatan awal kiosk, halaman HP, panel operator.
 2026-10-22 — ringkasan sesi diubah jadi dua pilihan besar (ambil / donasi ke yayasan) atas masukan user: donasi sebelumnya kurang terlihat.
 2026-10-22 — waktu habis tidak lagi mendonasikan poin (langkah `titip` & `hp`), kode klaim 7 hari.
+2026-10-26 — dari kanvas Design user (claude.ai artifact "Tukar Botol — layar kiosk & HP"): copy baru (hero, aturan, judul ringkasan per langkah, kartu pilihan), kotak ikon aturan berwarna + label sorot kuning #fffea2, statistik "bulan ini", ikon lay = botol berbaring, botol latar = siluet botol PET, layar terima kasih diperbesar.
+2026-10-26 — kiosk jadi panggung tetap 1280x800 yang diskalakan (proporsi di Chrome = kanvas); aturan layar pendek/sempit dihapus.

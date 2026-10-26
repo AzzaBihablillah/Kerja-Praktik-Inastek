@@ -3,7 +3,7 @@
   'use strict';
   var view = document.getElementById('view');
   var ME = null;           // profil bila sudah masuk
-  var BOTTLE_BG = '<svg class="bottle-bg" viewBox="0 0 200 420" aria-hidden="true"><path d="M80 10h40v34l18 28v300a28 28 0 0 1-28 28H90a28 28 0 0 1-28-28V72l18-28z" fill="none" stroke="currentColor" stroke-width="10"/><path d="M62 150h76M62 250h76" stroke="currentColor" stroke-width="10"/></svg>';
+  var BOTTLE_BG = '<svg class="bottle-bg" viewBox="0 0 200 420" aria-hidden="true"><path d="M82 48V70C82 94 40 104 40 142V360C40 390 52 404 68 404C76 404 80 396 84 396C88 396 92 404 100 404C108 404 112 396 116 396C120 396 124 404 132 404C148 404 160 390 160 360V142C160 104 118 94 118 70V48" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><path d="M74 42h52v6H74zM80 8h40a3 3 0 0 1 3 3v31H77V11a3 3 0 0 1 3-3z" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><path d="M40 168h120M40 236h120M44 286c34 10 78 10 112 0" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>';
 
   function render(html) { view.innerHTML = html; hydrateIcons(view); window.scrollTo(0, 0); }
   function when(ts) { return new Date(ts * 1000).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); }
@@ -178,7 +178,7 @@
   function tabHadiah(el, me) {
     el.innerHTML = '<div class="sk" style="height:76px;border-radius:20px"></div>';
     api('/api/hadiah').then(function (d) {
-      el.innerHTML = '<div class="stack"><p class="note">' + ic('info') + '<span>Hadiah simulasi untuk pengembangan. Kode yang keluar berawalan DEMO dan tidak berlaku di toko.</span></p><ul class="rows">' +
+      el.innerHTML = '<div class="stack"><p class="note">' + ic('info') + '<span>Hadiah simulasi untuk pengembangan. Poin yang keluar adalah DEMO dan belum berlaku di toko.</span></p><ul class="rows">' +
         d.hadiah.map(function (r, i) {
           var can = me.saldo >= r.cost && r.stok > 0, p = Math.min(1, me.saldo / r.cost);
           return '<li class="row-item" style="animation-delay:' + (i * .05) + 's"><span class="r-ic">' + ic('gift') + '</span><span><b>' + esc(r.nama) + '</b><span class="d">' + esc(r.ringkas) + '</span>' +
