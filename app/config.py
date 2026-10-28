@@ -49,8 +49,15 @@ SCAN_SAVE_DIR = os.path.join(REPO, "datasets", "1_foto_mentah", "{tanggal}_scan_
 # disimpan, keputusan "tolak: bukan botol". Belt TETAP berhenti sampai bendanya diambil (selama belum ada jalur tolak servo).
 FOREIGN_ENABLE = True
 FOREIGN_IOU_BOTTLE = 0.3     # kotak non_bottle yang menumpang kotak botol (IoU >= ini) diabaikan
-FOREIGN_WAIT_CLEAR = True    # True: tunggu benda diambil tangan; False: langsung jalan (bila servo jalur tolak sudah terpasang)
+FOREIGN_WAIT_CLEAR = False   # 27 Okt (user): belt TETAP jalan agar benda terbawa ke pembuangan; True = tunggu benda diambil tangan
+FOREIGN_CONF = 0.60          # 27 Okt: noda bekas selotip di belt terbaca non_bottle 0,50 -> ambang 0,60 (data 22 Okt: 50/53 benda nyata >= 0,60)
+HOLD_MAX_SEC = 15.0          # pengaman mode tunggu: benda yang tetap terlihat > ini (mis. noda belt) -> belt jalan lagi
 HOLD_CLEAR_SEC = 1.5         # benda dianggap sudah diambil bila tidak terlihat di zona selama ini
+
+# ---- deteksi "ada benda" dari patokan belt kosong (26 Okt) -> app/pencatat_benda.py ----
+# "catat" = hanya mencatat kejadian (BENDA.csv + gambar), TIDAK menghentikan belt; "mati" = nonaktif.
+# Mulai tiap sesi dengan belt KOSONG beberapa detik agar patokan terbentuk.
+PRESENCE_MODE = "catat"
 
 # ---- PENYAPU V di ujung belt (servo tim, 26 Okt) -> app/sortir.py ----
 # Gagal-aman tanpa sensor tambahan: sapuan BUANG berkala + sapuan TERIMA terjadwal untuk botol yang diterima.
@@ -68,15 +75,28 @@ SORTIR_LOG_BERKALA = False   # catat juga tiap sapuan buang berkala (konsol + SO
 SORTIR_SERIAL = os.environ.get("RVM_SORTIR_SERIAL", "")   # mis. "COM5" (laptop) / "/dev/ttyUSB0" (Nano); kosong = hanya dicatat
 SORTIR_BAUD = 115200
 
+# Folder PER SESI (27 Okt, permintaan user): <SCAN_SAVE_DIR tanggal>/sesi_<id>_<jamMulai>/ berisi frame + semua CSV sesi itu.
+SESI_DIR = ""                # diisi Machine.start_session; kosong = folder tanggal (mis. sebelum sesi pertama)
+
+
+def scan_dir():
+    """Folder simpan aktif: folder sesi yang sedang/terakhir berjalan, atau folder tanggal bila belum ada sesi."""
+    import datetime
+    d = SESI_DIR or SCAN_SAVE_DIR.replace("{tanggal}", datetime.date.today().isoformat())
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
 # ---- model KANDIDAT bayangan (sesi pembuktian, 23 Okt) ----
 # Bila aktif (`--kandidat`), setiap botol yang dipindai saat berhenti juga dinilai model kandidat pada FRAME DIAM YANG SAMA.
 # Keputusan di layar & poin TETAP dari model aktif; keputusan kandidat hanya dicatat ke <scan>/SCAN_KANDIDAT.csv untuk dibandingkan.
 # Hanya backend pytorch (berkas .pt kandidat). Menambah waktu berhenti (~2x analisis).
 SHADOW = False
 _M = os.path.join(REPO, "datasets", "3_model_final")
-KANDIDAT = dict(bottle=os.path.join(_M, "botol_ver10_kandidat.pt"), liquid=os.path.join(_M, "cairan_berisi_kandidat.pt"), size_rule="panjang",
+# 28 Okt (persetujuan user): detektor ver12 & merek v2 (latih + data belt 27 Okt); cairan tetap s35 (v2 dinilai offline)
+KANDIDAT = dict(bottle=os.path.join(_M, "botol_ver12_kandidat.pt"), liquid=os.path.join(_M, "cairan_berisi_kandidat.pt"), size_rule="panjang",
                 # merek (24 Okt): coca_cola vs non_coca_cola, resep A (foto belt saja), dinilai pada kotak botol model AKTIF; bonus tetap 0
-                brand=os.path.join(_M, "merek_coca_kandidat.pt"))
+                brand=os.path.join(_M, "merek_coca_v2_kandidat.pt"))
 
 # ---- mode KIOSK CAPTURER / ambil data (24 Okt, `--ambil-data`) ----
 # Mesin dipakai seperti biasa (berhenti-lalu-pindai, poin tampil) sambil mengumpulkan data belt nyata.

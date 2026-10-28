@@ -13,7 +13,7 @@ REASONS = {
     "cairan": ("Masih ada isinya", "Habiskan atau buang isinya dulu, lalu masukkan lagi."),
     "tutup_cairan": ("Masih bertutup dan masih ada isinya", "Habiskan atau buang isinya, lepas tutupnya, lalu masukkan lagi."),
     "leher": ("Leher botol tidak terlihat", "Baringkan botol di belt dengan leher menghadap samping, lalu coba lagi."),
-    "bukan_botol": ("Bukan botol PET", "Ambil kembali bendanya dari belt. Mesin ini hanya menerima botol plastik PET."),
+    "bukan_botol": ("Bukan botol PET", "Benda ini dibuang ke wadah tolak. Mesin ini hanya menerima botol plastik PET."),
 }
 SIZE_TEXT = {"kecil": "Kecil", "tanggung": "Tanggung", "besar": "Besar", "?": "Ukuran tak terbaca"}
 

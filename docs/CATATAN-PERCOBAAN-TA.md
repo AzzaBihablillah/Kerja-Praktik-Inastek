@@ -310,6 +310,117 @@ Perangkat: Jetson Nano Developer Kit B01 4 GB, L4T R32.7.4 (JetPack 4.6.4), mode
 **Perbaikan app:** `non_bottle` di zona = benda asing -> berhenti-lalu-pindai -> tolak 'bukan_botol' (frame + CSV disimpan) -> belt ditahan sampai benda hilang dari zona 1,5 s; kaitan jalur `app/sortir.py`. **Uji offline alur** (Machine dengan kamera tiruan, foto diam, zona pemicu diperlebar meniru benda lewat): non-botol 41/86 ditolak 'bukan botol' (41/41 belt jalan lagi setelah benda diambil), 30/86 dikira botol tetapi semua tertolak di tahap tutup/isi (leher 23, tutup_cairan 5, cairan 2), 15/86 tanpa reaksi; botol 0/94 salah ditahan.
 **Belum / keterbatasan:** 15/86 benda (17%) tak terlihat detektor sama sekali -> butuh deteksi "ada benda" yang tidak bergantung kelas. Prototipe `rvm_kp/benda.py` (bandingkan tiap piksel dengan warna barisnya) GAGAL offline: sabuk atas/bawah tidak sejajar baris gambar + pantulan cahaya -> salah alarm 48/64 foto botol. Cara yang tepat = patokan belt kosong per piksel diambil saat sesi mulai, tetapi tidak dapat diuji dengan data lama (tidak ada foto belt kosong; median sesi tercemar benda di tengah & kamera sempat bergeser) -> uji di belt. Alasan tolak untuk benda yang dikira botol menyesatkan ('leher tidak terlihat' alih-alih 'bukan botol'), tetapi tetap ditolak.
 
+### L-24 Detektor ver11: benda bukan botol NYATA diberi kotak non_bottle + penyeimbangan per jenis benda (27 Okt)
+**Masalah:** ver10 dilatih dengan foto non-botol nyata sebagai latar kosong -> tidak pernah menandai non_bottle pada benda nyata di belt (0/86), padahal app menolak benda asing lewat kelas non_bottle. Pada benda TEMPELAN (TrashNet) ver10 tetap menandai 97% -> ia belajar MENGABAIKAN benda nyata di belt kita, bukan tidak mampu.
+**Resep ver11** (`scripts/pipeline_botol/ver11_nonbotol.py`): resep ver10; 81 foto non-botol nyata 22 Okt diberi kotak non_bottle = usulan ver9c yang DIAUDIT user (5 dari 86 kotak tidak pas -> tidak dipakai; https://claude.ai/artifact/HWEc2Tc8bkcMBLuvBmVgKs); botol semprot & Listerine ikut sebagai non-botol (keputusan user 27 Okt). **Anti-bias (permintaan user):** plastik remas = 35/81 (43%) -> bobot per JENIS benda disamakan (plastik 35 salinan, jenis lain 24-36; batas 12 per foto) -> porsi plastik 9%.
+**CV 5 fold per benda (foto nyata 22 Okt, ambang 0,35):**
+
+| | ver9c | ver11 |
+|---|---|---|
+| non-botol DITERIMA sebagai botol | 33/81 | **5/81** (4 = Listerine) |
+| non-botol DITANDAI non_bottle | 50/81 | **78/81** (semua 12 jenis benda tertandai) |
+| botol terdeteksi | 154/154 | 154/154 |
+| botol salah ditandai non_bottle | 24/154 | **2/154** |
+
+ver10 (CV-nya sendiri, tanpa semprot/Listerine): non-botol diterima 0/74 vs ver11 1/74, tetapi ver10 tidak pernah menandai non_bottle.
+**Uji di data LAIN yang tak dilatih** (`scripts/pipeline_botol/ver11_uji_lain.py`, `datasets/4_eksperimen/botol/ver11/uji_lain.txt`) — ver9c / ver10 / ver11:
+- TrashNet ditahan ditempel ke belt (382 non-PET: kardus, kaca, logam, kertas, plastik lain, sampah): diterima 7% / 5% / **4%**; ditandai non_bottle 96% / 97% / **98%** (ver11 tertinggi di setiap kategori non-PET) -> kelas non_bottle TIDAK menyempit menjadi 'plastik kresek'.
+- TACO tempel (328): diterima 8,8% / 7,9% / **7,0%**; dikenali non_bottle 313 / 318 / 314.
+- Botol: sesi 20 Okt 117/117 semua; old_test recall botol 1,000 / 1,000 / **0,990** (turun ~3 dari 284), mAP50 0,995/0,995/0,993.
+- Cek jalan pintas (botol asli ditempel): studio 93,5% / 93,5% / **95,3%**; belt **100% / 97,1% / 95,1%** (ver11 menolak 5/102 botol tempelan belt, 10 dicap non_bottle) -> sedikit lebih condong menandai non_bottle pada botol tempelan.
+**Kesimpulan:** ver11 menutup celah benda asing nyata (ditandai 50 -> 78/81) tanpa bias ke plastik dan tanpa kehilangan botol nyata (154/154, sesi 20 Okt 117/117); kekurangan kecil: recall old_test 0,99 dan botol tempelan belt 95%. **Belum aktif**: uji di belt nyata (Kiosk Capturer, botol & non-botol BARU) sebelum menggantikan ver9c. Listerine masih diterima 4/4 (bentuknya botol) -> butuh lebih banyak contoh botol non-minuman.
+
+### L-25 Sesi pembuktian di belt nyata 27 Okt sore (Kiosk Capturer, PLC, kandidat bayangan ver11 + cairan_berisi + merek)
+Data: `datasets/1_foto_mentah/2026-10-27_scan_app/` — **6 sesi logis** (folder potongan akibat sesi terputus saat conveyor diperbaiki digabung 27 Okt malam; daftar di BACA.txt): sesi1 kosong tanpa tutup Coca-Cola, sesi2 kosong bertutup Coca-Cola, sesi3 kosong bertutup non, sesi4 kosong tanpa tutup non, sesi5 berisi air bertutup (merek campur; 1 botol tanpa tutup dari teman, tak diketahui yang mana -> label tutup +-1), sesi6 bukan botol; sesi0 = percobaan awal saat baterai (tidak dinilai). Label = label KELOMPOK dari user (lemah: satu botol salah kelompok = salah label). Sesi awal (folder tanggal, 14 botol) dijalankan saat laptop memakai BATERAI -> deteksi botol ~250 ms/frame (normal ~14 ms), berhenti ~3 s, video tersendat -> diulang setelah dicas; model kandidat lalu dipindah ke thread terpisah (berhenti 1,5-2,4 s).
+**Botol kosong (sesi 049-052, 72 botol: Coca-Cola Co./bukan x bertutup/tanpa tutup):**
+
+| | model aktif (ver9c, cap_belt_v2, cairan_RH) | kandidat (ver11, cairan_berisi, ukuran panjang) |
+|---|---|---|
+| keputusan akhir sesuai label | 67/72 | **70/72** |
+| cairan: botol kosong terbaca kosong | 60/72 | **70/72** |
+| tutup benar | **71/72** | 70/72 |
+
+Kesalahan aktif: botol kosong berlabel penuh/berwarna/semi-buram terbaca berisi (Fanta, Ichitan pisang, Big PET hijau, botol semi-buram, Frestea). Tutup LOLOS 1x (aktif & kandidat): Alfamart air mineral 1,5 L tutup BIRU MUDA (0/3 frame melihat tutup) -> botol bertutup diterima. Kandidat salah 'bertutup' 2x (kotak ver11 menggeser area leher). ver11 tidak mendeteksi botol #1 sesi 049 (satu kali).
+**Merek (model merek kandidat, coca_cola vs bukan):** 64/72 sesuai label kelompok; salah: Frestea (2x, p 0,00-0,01 -> data Frestea kurang), Fanta 1,5 L (0,45), Vit merah (2x terbaca Coca-Cola), Fitri (0,54; 0,97), botol bening berlabel kartun (0,90).
+**Benda bukan botol (sesi 060, 22 benda, user memantau: semua terlihat):** 22/22 DITOLAK, 0 diterima: 18 langsung 'bukan botol' (kelas non_bottle ver9c), 4 dikira botol oleh ver9c tetapi tertolak di tahap tutup/isi; ver11 tidak mendeteksi botol pada keempatnya. Masalah yang muncul & diperbaiki saat sesi: noda bekas selotip di belt terbaca non_bottle 0,50 dan belt MACET menunggu benda 'diambil' -> ambang benda asing 0,60 (data 22 Okt: 50/53 benda nyata >= 0,60), belt TIDAK lagi ditahan (keputusan user: benda asing ikut terbawa ke pembuangan), batas tahan 15 s sebagai pengaman.
+**Air bening (sesi 053-059, 35 botol):** 34/35 ditolak; label merek DIREVISI user menjadi campuran, label tutup belum pasti (sebagian mungkin tanpa tutup) -> angka cairan (aktif 28/35, kandidat 24/35 terbaca berisi) BELUM sah sampai user mengaudit tutup. **Audit user 27 Okt malam** (https://claude.ai/artifact/NEtxoetGHqam8V1YLP9daL, `datasets/4_eksperimen/air_tutup_audit/usulan.csv`): 34 bertutup dikonfirmasi, 1 dibuang; user RAGU soal ISI (botol dimasukkan teman; beberapa tampak kosong; air bening di botol bening tak terbaca dari foto) -> sesi air 053-059 TIDAK dipakai menilai model cairan (hanya contoh botol bertutup). Penilaian air bening & keputusan aktivasi cairan_berisi **Koreksi user (27 Okt malam):** 95% botol dimasukkan user sendiri sesuai label; SEMUA botol air DIISI user (penuh/sedikit acak) dan bertutup -> sesi air SAH untuk menilai cairan. Botol S53B195 (Nestlé Pure Life, tutup BIRU) = bertutup + berisi air, tetapi DITERIMA: model tutup 0/3 frame melihat tutup DAN cairan aktif 0,01 / kandidat 0,00 -> kesalahan ganda. Bersama Alfamart 1,5 L (tutup biru muda, sesi 051) = 2 botol bertutup lolos hari ini, keduanya TUTUP BIRU -> butuh data tutup biru/biru muda untuk latih ulang model tutup.
+**Cairan, gabungan data hari ini** (72 botol kosong; 35 botol berisi air bening bertutup, diisi user):
+
+| aturan 'berisi' | kosong salah 'berisi' | air terdeteksi |
+|---|---|---|
+| aktif RH | 12/72 | 28/35 |
+| kandidat cairan_berisi | 2/72 | 24/35 |
+| ATAU | 12/72 | 29/35 |
+| DAN | 2/72 | 23/35 |
+| rata-rata p >= 0,5 | 5/72 | 26/35 |
+
+Tarik-ulur: RH menangkap lebih banyak air tetapi menolak 1 dari 6 botol kosong sah; kandidat hampir tak salah tolak tetapi meloloskan ~30% air. Usul: rata-rata keduanya sebagai kandidat berikutnya. Catatan: semua botol air bertutup (tutup ikut terlihat); kasus nyata yang perlu ditangkap = air TANPA tutup -> perlu sesi kecil air bening tanpa tutup. Pilihan aturan = kebijakan (mana lebih buruk: botol sah ditolak vs air lolos) -> keputusan user/mitra.
+**Pencatat 'ada benda' (patokan belt kosong, mode catat):** BELUM layak: kejadian 'tak dikenal' palsu dari noda belt yang bergerak, getaran kamera saat belt jalan (tepi rangka), dan perubahan cahaya; tidak memengaruhi keputusan. Data tersimpan untuk penyetelan. **Penyebab perubahan cahaya dipastikan user:** lampu ditutup PLASTIK LEPAS yang bergerak -> cahaya bocor berubah-ubah (sesi 062: 11 kejadian palsu tanpa benda). Rekomendasi: peredam lampu kaku terpasang mati (akrilik/mika buram) + tutup atas zona kamera.
+**Kesimpulan sementara:** kandidat cairan_berisi jelas lebih baik dari RH pada botol kosong berlabel (60 -> 70/72); model tutup aktif tetap andal kecuali tutup biru muda; benda bukan botol tertolak semua; merek lemah pada Frestea & pesaing berlabel merah/hijau.
+
+### L-26 Kesimpulan uji belt 27 Okt (6 sesi, 108 botol + 22 bukan botol) — disusun 27 Okt malam
+Statistik: rentang = interval Wilson 95%; perbandingan aktif vs kandidat = uji McNemar berpasangan (botol yang sama).
+**Didukung data:**
+1. **Sistem utuh berjalan di belt nyata** (kamera + model + PLC + berhenti-lalu-pindai), 130 benda, berhenti median 1,7 s/botol (maks 2,4 s). Keputusan akhir botol baru: aktif 101/107 (94%; 88-97%), kandidat 104/107 (97%; 92-99%).
+2. **Kandidat cairan_berisi lebih baik pada botol KOSONG** (bukan kebetulan): salah 'berisi' 2/72 vs aktif 12/72; dari 10 botol yang berbeda hasil, 10 dimenangkan kandidat (McNemar p=0,002). Kesalahan aktif terkumpul pada botol berlabel penuh/berwarna/semi-buram (Fanta, Ichitan, Frestea, Big PET hijau).
+3. **Model tutup andal** (106/108) dengan **titik buta tutup BIRU/biru muda**: kedua botol bertutup yang lolos bertutup biru (Alfamart 1,5 L sesi3; Nestlé Pure Life berisi air sesi5). Belum terbukti semua tutup biru gagal; prioritas data latih.
+4. **Benda bukan botol tertolak 22/22** (18 langsung 'bukan botol', 4 lewat tahap tutup/isi); ver11 tidak mengira botol satu pun.
+5. **Model merek belum layak untuk bonus**: 64/72; Coca-Cola dikenali 20/22, tetapi 6/50 non-Coca-Cola dianggap Coca-Cola (Vit, Fitri) -> ~1 dari 8 botol non-Coca-Cola akan dapat bonus; Frestea tidak dikenali.
+6. **Kondisi operasi berpengaruh besar**: laptop berbaterai (GPU hemat daya) -> lambat & tersendat; cahaya bocor dari penutup lampu plastik yang bergerak -> salah alarm pencatat 'ada benda'. Sejalan dengan uji ketahanan (§8): daya & pencahayaan harus distabilkan.
+**Belum bisa disimpulkan:** aktif vs kandidat secara keseluruhan (101 vs 104, McNemar p=0,38: setara secara statistik); deteksi AIR (aktif 28/35 vs kandidat 24/35, p=0,22; n kecil; semua botol air bertutup, padahal kasus nyata = air TANPA tutup); ukuran (tidak ada label ml); medan lain (satu hari, satu belt, satu pencahayaan); label = label kelompok (satu botol salah kelompok = salah label; sesi5 tutup +-1).
+**Rekomendasi:** (1) aktifkan cairan_berisi atau rata-rata kedua model (bukti terkuat: jauh lebih sedikit botol sah ditolak), didahului sesi kecil air bening TANPA tutup — keputusan user; (2) pertahankan model tutup aktif, kumpulkan botol bertutup biru/biru muda untuk latih ulang; (3) bonus merek tetap MATI sampai dilatih ulang dengan data 27 Okt (Frestea, Vit, Fitri); (4) ver11 belum menggantikan ver9c (kotaknya menyebabkan 2 salah 'bertutup' + 1 botol tak terdeteksi); (5) stabilkan mesin: daya selalu tercolok (atau Jetson + adaptor 5V 4A), peredam lampu kaku.
+
+### L-27 Latih ulang model cairan 'berisi' dengan data belt 27 Okt (28 Okt dini hari)
+Kode: `scripts/pipeline_cairan/s36_berisi_27okt.py` (resep s35 = s32 RN + air bening 22 Okt + 3 salinan geser-hue; yolov8n-cls 224, 30 epoch, kelas seimbang). Data baru: frame diam 27 Okt, potongan dari kotak ver9c terbesar per frame (`fold_crop`), 321 frame / 107 botol (sesi1-4 kosong = 72 botol -> 'kosong'; sesi5 air bening diisi user = 35 botol -> 'berwarna' = berisi; baris bukan_botol & `buang_audit` dikeluarkan). Daftar: `datasets/4_eksperimen/cairan/crops27.csv` (id `T27_<sesi>_<botol>_<frame>`).
+**Validasi:** CV 5 fold, kelompok = SESI 27 Okt (bukan botol: botol fisik yang sama kemungkinan dipakai di sesi1&2 dan sesi3&4) + kelompok lama seperti s32; tiap fold menguji SATU sesi 27 Okt yang tidak dilatih. Keputusan per botol = median p dari 3 frame (sama dengan aplikasi), ambang 0,5. Pembanding pada botol yang sama: cairan_RH (aktif) dan cairan_berisi_kandidat (s35), keduanya tak pernah melihat data 27 Okt. Hasil: `cv_27okt.jsonl`, `cv_27okt_report.txt`.
+
+| model | kosong salah 'berisi' (72) | air terdeteksi (35) | per sesi benar: s1 / s2 / s3 / s4 / s5 |
+|---|---|---|---|
+| aktif RH | 15/72 | **31/35** | 8/11, 10/11, 19/27, 20/23, 31/35 |
+| kandidat berisi (s35) | **3/72** | 27/35 | 11/11, 11/11, 25/27, 22/23, 27/35 |
+| berisi_v2 (CV, + data 27 Okt) | **3/72** | 24/35 | 11/11, 11/11, 24/27, 23/23, 24/35 |
+| rata-rata p RH & s35 | 6/72 | 28/35 | |
+
+Regresi kelompok lama (frame, fold yang sama): berisi_v2 benar 319/351 (berwarna 175/198, kosong 144/153).
+**Tafsir jujur:** (1) menambah 72 botol kosong belt TIDAK memperbaiki botol kosong sesi yang tak dilatih (3/72 = sama dengan s35) — s35 sudah nyaris sempurna di sini; (2) air turun 27 -> 24/35, tetapi fold sesi5 TIDAK pernah melihat air di belt (semua air 27 Okt ada di sesi5), jadi angka ini hanya menunjukkan bahwa tambahan botol kosong sedikit menggeser model ke 'kosong'; manfaat data air belt sesi5 BELUM dapat diukur dengan data yang ada; (3) angka ulang-potong offline sedikit berbeda dengan log aplikasi (RH 15 vs 12, s35 air 27 vs 24) karena kotak dan potongan dibuat ulang dari foto (aplikasi memakai kotak pelacak), arah kesimpulan sama.
+**Model final:** `datasets/3_model_final/cairan_berisi_v2_kandidat.pt` (semua data termasuk 35 botol air belt). TIDAK menggantikan kandidat s35 maupun model aktif. Cara menilai: sesi belt berikutnya dengan air bening (sebaiknya TANPA tutup, per level isi) -> skor offline frame tersimpan untuk RH, s35, v2 dan rata-rata. Catatan teknis: percobaan pertama gagal karena folder data latih = folder keluaran (bobot terhapus); diperbaiki (`cv27_data/`).
+
+### L-28 Audit data untuk merek & detektor ver12 (28 Okt dini hari)
+**Merek botol air sesi5** (https://claude.ai/artifact/54QAtZEtWudesJDd2FH9GE, `datasets/4_eksperimen/merek_air_audit/hasil_audit.csv`): usulan = merek_coca_kandidat; user mengubah 5/35 (model benar 30/35): BIG Cola & 3 botol lain dikira Coca-Cola -> bukan; Frestea dikira bukan -> Coca-Cola. Hasil: 10 Coca-Cola Co., 25 bukan. Label merek sesi1-4 = label kelompok (Coca-Cola: sesi1-2, bukan: sesi3-4).
+**Kotak detektor ver12** (https://claude.ai/artifact/Fh3joDUr8T3YuyfTAfPGhA, `datasets/4_eksperimen/ver12_audit/usulan.csv`): usulan = ver11 per frame (3 frame/benda), kelas mengikuti sesi (sesi6 = non_bottle). 132 benda; user menandai 3 'salah' (V53B214 kotak di tepi tanpa botol utama, V60B33, V60B45 kotak goyang) -> 129 benda / 387 frame dipakai. Deteksi tambahan ver11 (kotak kuning, 13 benda) diperiksa visual: pantulan cahaya di belt (tepi kiri), benda gelap/rangka di ujung belt (tepi kanan), sekali tangan — tidak ada botol terpotong -> dibiarkan TANPA label sebagai contoh negatif (rencana awal menutup abu dibatalkan). Latih ver12: `scripts/pipeline_botol/ver12_belt27.py` (CV 2 fold per pasangan sesi: A = sesi1+2+5, B = sesi3+4+6; dinilai per frame asli vs ver11).
+**Merek v2** (`scripts/pipeline_merek/m08_belt27.py`; resep A m07 + 321 frame / 107 botol 27 Okt; CV 2 fold: A uji sesi1+2 + separuh sesi5, B uji sesi3+4 + separuh sesi5; per botol = rata-rata p 3 frame; hasil `datasets/4_eksperimen/merek/cv_belt27_report.txt`):
+
+| model | benar | Coca-Cola Co. dikenali | non-Coca salah dapat bonus |
+|---|---|---|---|
+| m07 (kandidat, tanpa data 27 Okt) | 101/107 | 29/32 | 3/75 |
+| m08 v2 (CV) | **104/107** | 30/32 | **1/75** |
+
+Berbeda hasil pada 5 botol: 4 dimenangkan v2, 1 oleh m07 (McNemar p=0,38: belum signifikan, n kecil). Yang tetap salah: 2 botol sesi1 (S49B9, S49B22, p 0,00 — Frestea; Frestea hanya ada beberapa botol, sebagian di fold uji) dan S52B117 (non, p 0,73). Kebocoran mungkin: botol sesi5 bisa botol fisik yang sama dengan sesi1-4 -> angka sesi5 (35/35) optimistis. Angka m07 offline (sesi1-4: 67/72) berbeda dengan log aplikasi (64/72) karena potongan dibuat ulang dari kotak ver9c. Final: `datasets/3_model_final/merek_coca_v2_kandidat.pt` (semua data), BELUM dipakai; bonus merek tetap mati. Uji sah: sesi belt berikutnya dengan botol yang belum pernah dilatih (terutama Frestea, Vit, Fitri, BIG).
+**Detektor ver12** (hasil `datasets/4_eksperimen/botol/ver12/cv_report.txt`, 387 frame / 129 benda, ambang 0,35):
+
+| | ver11 | ver12 (CV) |
+|---|---|---|
+| botol terdeteksi (frame, IoU>=0,5 dg kotak audit) | 327/327 | 327/327 |
+| botol salah non_bottle | 0/327 | 0/327 |
+| bukan botol ditandai non_bottle / diterima sbg botol | 60/60 / 0 | 60/60 / 0 |
+| frame dengan deteksi TAMBAHAN (alarm palsu: pantulan, rangka ujung belt, tangan) | 21/387 | **4/387** |
+
+Tafsir jujur: kotak acuan = usulan ver11 yang diaudit, dan frame yang tidak dideteksi ver11 tidak masuk data -> deteksi 100% ver11 terjadi BY CONSTRUCTION (bias menguntungkan ver11); ver12 menyamainya. Peningkatan yang nyata = alarm palsu turun ~5x (penting untuk benda asing/penyapu). Masalah kotak ver11 yang menggeser area leher (2 salah 'bertutup' 27 Okt) TIDAK diuji di sini -> perlu skor ulang pipa tutup dengan kotak ver12 pada frame 27 Okt atau sesi berikutnya. Final: `datasets/3_model_final/botol_ver12_kandidat.pt`, BELUM dipakai (kandidat bayangan app masih ver11).
+
+### L-29 Cek ambang cairan & jejak data tak-teraudit (28 Okt, permintaan user setelah tinjauan kesalahan proses)
+**Ambang (botol 27 Okt, p per botol dari `cv_27okt.jsonl`, tanpa latih ulang):** AUC RH 0,896 · s35 0,937 · v2 (CV) 0,917 · rata-rata RH+s35 **0,941**.
+
+| ambang | RH kosong salah / air | s35 kosong salah / air | rata-rata kosong salah / air |
+|---|---|---|---|
+| 0,1 | 22 / 33 | 4 / 27 | 18 / 33 |
+| 0,3 | 16 / 33 | 4 / 27 | 14 / 31 |
+| 0,5 | 15 / 31 | 3 / 27 | 6 / 28 |
+| 0,7 | 13 / 30 | 3 / 24 | 3 / 26 |
+| 0,9 | 10 / 27 | 2 / 22 | 3 / 22 |
+
+Kesimpulan: ambang BUKAN penyebab utama di data 27 Okt. Air yang luput dari s35 diberi p < 0,08 (salah yakin, 8 botol: S53B185, S53B195, S59B318, S53B177, S59B301, S54B229, S57B265, S54B226), jadi menurunkan ambang tidak menolong; RH hanya bisa menukar salah tolak dengan air lolos. Kalibrasi silang (ambang dipilih di separuh botol, diuji di separuh lain) untuk rata-rata RH+s35 memilih ambang ±0,5 (stabil), untuk s35/v2 memilih ambang ~0,0001-0,07 (tidak stabil). Perbaikan nyata untuk air harus dari DATA (air di belt), bukan ambang. Peringatan: dihitung dan dinilai pada data yang sama (kecuali kalibrasi silang) -> deskriptif.
+**Jejak data yang dipilah Claude tanpa audit:** (a) pemilahan visual `bottle_detection` (berwarna/bukan/ragu, `old_relabel_manual.csv`) dipakai `s06_det_data.py` hanya untuk MEMBUANG gambar berkotak 'ragu' pada data detektor B2 (ver8 -> ver8b/ver9c/ver10/ver11/ver12); label kotaknya tetap label tim asli (bottle/non_bottle), jadi pemilahan Claude tidak mengubah label detektor aktif, hanya pilihan gambar. Kelas berwarna/bukan dari pemilahan itu hanya dipakai detektor 3 kelas A3 (ditolak) dan opsi `s03 --old` (percobaan awal). (b) 540 potongan WEB (Fanta internet) di `crops.csv` dan potongan warisan TIDAK masuk model cairan aktif/kandidat: `s30_final3`/`s32`/`s35`/`s36` hanya memakai src W16, V20, crops22 (+22b, +27 Okt). (c) Label kotak data warisan tim sendiri tidak pernah kita audit penuh (contoh: 1 Aqua berlabel non_bottle, §4b).
+
 ### L-9 Model final
 `datasets/4_eksperimen/cairan/final/` (belt W16 + C13) dan `final2/` (+ pilot dan 28 foto tambahan). Keduanya tidak punya uji bersih; akurasi = hasil CV di atas. Belum dipasang di server (lingkup Capstone 1).
 

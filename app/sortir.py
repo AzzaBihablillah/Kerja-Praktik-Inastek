@@ -146,7 +146,7 @@ class Sortir(object):
         if config.SCAN_SAVE_DIR and not self.sim and why != "kembali" and (why != "berkala" or config.SORTIR_LOG_BERKALA):
             try:
                 import datetime
-                d = config.SCAN_SAVE_DIR.replace("{tanggal}", datetime.date.today().isoformat()); os.makedirs(d, exist_ok=True)
+                d = config.scan_dir()
                 p = os.path.join(d, "SORTIR.csv"); new = not os.path.exists(p)
                 with open(p, "a") as fh:
                     if new:

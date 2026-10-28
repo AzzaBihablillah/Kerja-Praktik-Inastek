@@ -107,6 +107,11 @@
       </div>
     </section>
     <section class="panel">
+      <h2>Ada benda (patokan belt kosong) <span class="chip" id="bdMode">-</span></h2>
+      <dl class="kv" id="bdKv"></dl>
+      <p class="note">Mode catat: tidak menghentikan belt. Mulai sesi dengan belt kosong beberapa detik agar patokan terbentuk. Kejadian "tak dikenal" = benda yang lewat tanpa dikenali detektor (BENDA.csv + gambar di folder scan/benda).</p>
+    </section>
+    <section class="panel">
       <h2>Penyapu V <span class="chip" id="vPos">-</span></h2>
       <dl class="kv" id="vKv"></dl>
       <div class="scroll" style="margin-top:8px"><table><thead><tr><th>botol</th><th>ke</th><th>tiba dalam (s belt)</th></tr></thead><tbody id="vQ"></tbody></table></div>
@@ -177,6 +182,13 @@
     api('/api/operator').then(function (d) {
       var m = d.mesin; sim = m.sim; auto = !!m.auto;
       if (d.capturer) capRender(d.capturer);
+      if (d.benda) {
+        var bd = d.benda, kj = bd.kejadian || {};
+        $('bdMode').textContent = bd.mode;
+        $('bdKv').innerHTML = [['patokan', bd.patokan_siap ? 'siap' : 'mengumpulkan ' + bd.patokan_kumpul], ['botol', kj.botol || 0], ['non-botol', kj.non_botol || 0],
+          ['TAK DIKENAL', kj.tak_dikenal || 0], ['luput patokan', kj.luput_patokan || 0]]
+          .map(function (x) { return '<div><dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd></div>'; }).join('');
+      }
       if (d.sortir) {
         var v = d.sortir;
         $('vPos').textContent = v.aktif ? v.posisi : 'nonaktif';

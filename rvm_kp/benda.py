@@ -74,3 +74,69 @@ def outside(blob, boxes, pad=0.12):
         ix = max(0.0, min(x2, b[2] + pad * bw) - max(x1, b[0] - pad * bw)); iy = max(0.0, min(y2, b[3] + pad * bh) - max(y1, b[1] - pad * bh))
         cov = max(cov, ix * iy / area)
     return 1.0 - cov
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Patokan BELT KOSONG per piksel (26 Okt). Cara yang tepat untuk kamera diam: pantulan cahaya & kemiringan sabuk ikut
+# masuk patokan. Patokan = median beberapa frame tanpa benda (diambil saat sesi mulai), diperbarui pelan saat belt kosong.
+REF_FRAMES = 15               # frame kosong untuk membangun patokan
+REF_ALPHA = 0.03              # laju pembaruan patokan saat belt kosong (tahan perubahan cahaya pelan)
+REF_DIFF_T = 22.0             # jarak warna Lab dari patokan -> benda
+REF_MIN_AREA = 0.004          # luas gumpalan minimal (fraksi frame)
+
+
+class BeltRef(object):
+    """ref = BeltRef(); ref.feed_empty(frame) sampai ref.ready; lalu ref.objects(frame, zone) -> gumpalan benda."""
+
+    def __init__(self, n=REF_FRAMES, diff_t=REF_DIFF_T, min_area=REF_MIN_AREA):
+        self.n, self.diff_t, self.min_area = n, diff_t, min_area
+        self.buf = []; self.ref = None; self.shape = None
+
+    @property
+    def ready(self):
+        return self.ref is not None
+
+    def _lab(self, frame):
+        sm = cv2.resize(frame, (W, round(frame.shape[0] * W / frame.shape[1])), interpolation=cv2.INTER_AREA)
+        return sm, cv2.cvtColor(cv2.GaussianBlur(sm, (5, 5), 0), cv2.COLOR_BGR2LAB).astype(np.float32)
+
+    def reset(self):
+        self.buf = []; self.ref = None
+
+    def feed_empty(self, frame):
+        """Frame yang diyakini kosong (tanpa kotak detektor apa pun). Membangun lalu memperbarui patokan."""
+        sm, lab = self._lab(frame)
+        if self.ref is None:
+            if self.shape is not None and lab.shape != self.shape:
+                self.buf = []
+            self.shape = lab.shape; self.buf.append(lab)
+            if len(self.buf) >= self.n:
+                self.ref = np.median(np.stack(self.buf), axis=0).astype(np.float32); self.buf = []
+                self.ref_bgr = sm.copy()
+        else:
+            self.ref += REF_ALPHA * (lab - self.ref)
+
+    def mask(self, frame):
+        sm, lab = self._lab(frame)
+        if self.ref is None or lab.shape != self.ref.shape:
+            return sm, None
+        d = np.linalg.norm(lab - self.ref, axis=2)
+        m = (d > self.diff_t).astype(np.uint8) * 255
+        m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+        m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
+        return sm, m
+
+    def objects(self, frame, zone=(0.25, 0.75), mask=None):
+        """Gumpalan (x1, y1, x2, y2, luas_frac) berpusat di zona, koordinat frame masukan."""
+        if mask is None:
+            _, mask = self.mask(frame)
+        if mask is None:
+            return []
+        k = frame.shape[1] / W; h, w = mask.shape
+        n, _, st, cen = cv2.connectedComponentsWithStats(mask, 8)
+        out = []
+        for i in range(1, n):
+            x, y, bw, bh, a = st[i]
+            if a >= self.min_area * h * w and zone[0] * w <= cen[i][0] <= zone[1] * w:
+                out.append((x * k, y * k, (x + bw) * k, (y + bh) * k, a / float(h * w)))
+        return out

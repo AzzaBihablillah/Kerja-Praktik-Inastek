@@ -15,6 +15,7 @@ import cv2
 from . import config
 from .tracker import Tracker, decide, decide_foreign, iou, center
 from .sortir import Sortir
+from .pencatat_benda import PencatatBenda
 
 LIME = (50, 230, 196)       # BGR, sama dengan --lime di CSS
 CORAL = (64, 96, 232)
@@ -37,9 +38,7 @@ def rc_imgsz(an, which):
 
 
 def scan_dir():
-    import datetime
-    d = config.SCAN_SAVE_DIR.replace("{tanggal}", datetime.date.today().isoformat()); os.makedirs(d, exist_ok=True)
-    return d
+    return config.scan_dir()                  # folder per sesi (app/config.py)
 
 
 def csv_add(path, row, order):
@@ -82,6 +81,7 @@ class Machine:
         self.tracker = Tracker()
         self.tracker2 = Tracker()           # benda BUKAN botol (kelas non_bottle)
         self.hold = None                    # benda asing ditahan: belt berhenti sampai diambil
+        self.benda = PencatatBenda(sim=sim)    # "ada benda" dari patokan belt kosong (mode catat)
         self.sortir = Sortir(conveyor, sim=sim)   # penjadwal penyapu V terima/buang (servo tim; kini dicatat)
         self.lock = threading.RLock()
         self.src = self.an = None
@@ -92,6 +92,8 @@ class Machine:
         self._stop = threading.Event()
         self._last_stamp = ""
         self.an2 = None; self.brand2 = None
+        import queue
+        self._shadow_q = queue.Queue()      # pekerjaan model kandidat (thread terpisah)
         self.batch = None                   # label kelompok aktif (kiosk capturer, --ambil-data)
         self.session = None                 # dict saat sesi aktif
         self.last_summary = None
@@ -101,6 +103,20 @@ class Machine:
     def start(self):
         self._t.start()
         self.sortir.start()
+        threading.Thread(target=self._shadow_worker, name="rvm-kandidat", daemon=True).start()
+
+    def _shadow_worker(self):
+        """Pekerja antrean model kandidat, terpisah dari loop kamera (belt sudah jalan lagi saat ini bekerja)."""
+        while not self._stop.is_set():
+            try:
+                t, frames, plc_ok, b = self._shadow_q.get(timeout=0.5)
+            except Exception:
+                continue
+            self._shadow(t, frames, plc_ok, b)
+            with self.lock:
+                b["_kandidat_selesai"] = True
+                if b.get("_dihitung_aktif"):                 # botol sudah tercatat lebih dulu -> lengkapi hitungan kandidat
+                    self._count_kandidat(b)
 
     def stop(self):
         self._stop.set(); self._t.join(timeout=3)
@@ -187,6 +203,8 @@ class Machine:
                 results = self.an.analyze(frame)
                 done = self.tracker.update(results, frame.shape[1], now)
                 fr = self._foreign_results(results) if config.FOREIGN_ENABLE else []
+                self.benda.step(frame, results, getattr(self.an, "last_nonbottle", None) or [], now,
+                                self.session["id"] if self.session else 0)
                 done2 = self.tracker2.update(fr, frame.shape[1], now)
                 if self.hold is not None:
                     self._hold_step(fr, frame.shape[1], now)
@@ -277,14 +295,15 @@ class Machine:
         self._tag(b)
         self._save_scan(t, b, frames, votes)
         if self.an2 is not None:
-            self._shadow(t, frames, plc_ok, b)
+            b["_kandidat_tertunda"] = True
+            self._shadow_q.put((t, frames, plc_ok, b))             # dikerjakan pekerja; loop kamera langsung lanjut
         return b
 
     # ------------------------------------------------------------------ benda bukan botol
     def _foreign_results(self, results):
         """Kotak non_bottle frame ini yang tidak menumpang kotak botol."""
         nb = getattr(self.an, "last_nonbottle", None) or []
-        return [r for r in nb if all(iou(r.box, b.box) < config.FOREIGN_IOU_BOTTLE for b in results)]
+        return [r for r in nb if r.conf >= config.FOREIGN_CONF and all(iou(r.box, b.box) < config.FOREIGN_IOU_BOTTLE for b in results)]
 
     def _stop_and_scan_foreign(self, t):
         """Benda asing masuk zona: berhenti, ambil frame diam. Bila ternyata botol -> serahkan ke alur botol (None).
@@ -326,6 +345,12 @@ class Machine:
         h = self.hold
         if h is None:
             return
+        if now - h["since"] > config.HOLD_MAX_SEC:                 # tetap terlihat terlalu lama: bukan benda yang bisa diambil
+            self.hold = None
+            if self.conveyor.enabled and self.session is not None:
+                self.conveyor.run(True)
+            print("[asing] #%d masih terlihat setelah %.0f s (kemungkinan noda/bekas di belt) -> belt jalan lagi" % (h["id"], now - h["since"]), flush=True)
+            return
         if seen:
             h["clear"] = None
         elif h["clear"] is None:
@@ -364,7 +389,7 @@ class Machine:
             if not config.SCAN_SAVE_DIR:
                 return
             csv_add(os.path.join(scan_dir(), "SCAN_KANDIDAT.csv"), dict(
-                waktu=self._last_stamp, sesi=self.session["id"] if self.session else 0, botol=t.id, keputusan_kandidat=k["decision"],
+                waktu=(b or {}).get("waktu", self._last_stamp), sesi=self.session["id"] if self.session else 0, botol=t.id, keputusan_kandidat=k["decision"],
                 alasan_kandidat=k.get("reason") or "", p_cairan_kandidat=k["p_liquid"], p_per_frame=" ".join("%.2f" % r.p_liquid for r in vv),
                 ukuran_kandidat=k["size"], plc_berhenti_ok=plc_ok, p_coca_kandidat=pc,
                 merek_kandidat="" if pc == "" else ("coca_cola" if pc >= self.brand2.thr else "non_coca_cola"),
@@ -446,7 +471,10 @@ class Machine:
         if isi not in config.KELOMPOK_ISI or tutup not in config.KELOMPOK_TUTUP:
             raise ValueError("Label kelompok tidak dikenal.")
         now = datetime.datetime.now()
-        k = dict(id=now.strftime("K%H%M%S"), mulai=time.time(), isi=isi, tutup=tutup, produk=(produk or "").strip()[:60],
+        kid = now.strftime("K%H%M%S")
+        if self.batch is not None and self.batch["id"].startswith(kid):        # dua kelompok dalam detik yang sama: tetap unik
+            kid += "_%d" % (int(self.batch["id"].rsplit("_", 1)[1]) + 1 if "_" in self.batch["id"] else 2)
+        k = dict(id=kid, mulai=time.time(), isi=isi, tutup=tutup, produk=(produk or "").strip()[:60],
                  ml=str(ml or "").strip()[:10], catatan=(catatan or "").strip()[:160], harapan=config.harapan_kelompok(isi, tutup),
                  n=0, cocok=0, n_k=0, cocok_k=0, beda=[])
         with self.lock:
@@ -489,12 +517,35 @@ class Machine:
         if not k["harapan"]:
             return
         k["cocok"] += b["cocok"] == "ya"
+        b["_dihitung_aktif"] = True
+        if b.get("_kandidat_tertunda") and not b.get("_kandidat_selesai"):
+            if b["cocok"] != "ya":                           # kandidat belum selesai: catat yang aktif dulu
+                self._beda(k, b)
+            return
         if b.get("cocok_kandidat"):
             k["n_k"] += 1; k["cocok_k"] += b["cocok_kandidat"] == "ya"
         if b["cocok"] != "ya" or b.get("cocok_kandidat") == "tidak":
-            k["beda"].append(dict(botol=b["id"], waktu=b.get("waktu", ""), aktif=b["decision"] + (" · " + b["reason"] if b.get("reason") else ""),
-                                  kandidat=(b.get("kandidat", "") + (" · " + b["kandidat_alasan"] if b.get("kandidat_alasan") else "")),
-                                  p_cairan=b["p_liquid"], ukuran=b["size"]))
+            self._beda(k, b)
+
+    def _beda(self, k, b):
+        k["beda"].append(dict(botol=b["id"], waktu=b.get("waktu", ""), aktif=b["decision"] + (" · " + b["reason"] if b.get("reason") else ""),
+                              kandidat=(b.get("kandidat", "") + (" · " + b["kandidat_alasan"] if b.get("kandidat_alasan") else "")),
+                              p_cairan=b["p_liquid"], ukuran=b["size"]))
+
+    def _count_kandidat(self, b):
+        """Pekerja kandidat selesai SETELAH botol tercatat: tambah hitungan kandidat & perbarui/isi daftar beda."""
+        k = self.batch
+        if not config.DATA_MODE or k is None or b.get("kelompok") != k["id"] or not k["harapan"]:
+            return
+        if b.get("cocok_kandidat"):
+            k["n_k"] += 1; k["cocok_k"] += b["cocok_kandidat"] == "ya"
+        teks = b.get("kandidat", "") + (" · " + b["kandidat_alasan"] if b.get("kandidat_alasan") else "")
+        for e in k["beda"]:
+            if e["botol"] == b["id"]:
+                e["kandidat"] = teks
+                return
+        if b.get("cocok_kandidat") == "tidak":
+            self._beda(k, b)
 
     def session_public(self):
         s = self.session
@@ -510,8 +561,23 @@ class Machine:
             if self.session is not None:
                 return None, "Sesi sudah berjalan."
             sid = self.db.session_start(capturer=config.DATA_MODE); now = time.time()
+            if config.SCAN_SAVE_DIR and not self.sim:
+                import datetime
+                base = config.SCAN_SAVE_DIR.replace("{tanggal}", datetime.date.today().isoformat())
+                config.SESI_DIR = os.path.join(base, "sesi_%03d_%s" % (sid, datetime.datetime.now().strftime("%H%M%S")))
+                os.makedirs(config.SESI_DIR, exist_ok=True)
+                print("[sesi] #%d data disimpan di %s" % (sid, config.SESI_DIR), flush=True)
+                if self.batch is not None:                # kelompok yang dipilih sebelum sesi ikut tercatat di folder sesi ini
+                    k = self.batch
+                    try:
+                        csv_add(os.path.join(config.SESI_DIR, "KELOMPOK.csv"), dict(
+                            kelompok=k["id"], tanggal=datetime.date.today().isoformat(), mulai=datetime.datetime.now().strftime("%H:%M:%S"),
+                            isi=k["isi"], tutup=k["tutup"], produk=k["produk"], ml=k["ml"], catatan=k["catatan"], harapan=k["harapan"]), KELOMPOK_COLS)
+                    except Exception as e:
+                        print("[sesi] KELOMPOK.csv gagal:", e)
             self.session = dict(id=sid, started=now, last_seen=now, points=0, valid=0, invalid=0, grams=0, bottles=[])
             self.tracker.reset(); self.tracker2.reset(); self.hold = None
+            self.benda.reset()
             self.last_summary = None
         self.conveyor.run(True)
         self.emit(dict(type="session_start", session=self.session_public(), idle_max=config.IDLE_TIMEOUT))
@@ -524,6 +590,7 @@ class Machine:
             for t in self.tracker.flush():
                 self._record(decide(t, self.liquid_thr))
             s = self.session; self.session = None; self.hold = None
+            self.benda._finish()
         self.conveyor.run(False)
         row, claim = self.db.session_end(s["id"], ("capturer_" + reason) if config.DATA_MODE else reason, make_claim=not config.DATA_MODE)
         self.last_summary = dict(session=dict(id=s["id"], points=row["points"], valid=row["valid"], invalid=row["invalid"],
