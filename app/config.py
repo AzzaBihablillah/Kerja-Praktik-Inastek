@@ -49,6 +49,15 @@ SCAN_SAVE_DIR = os.path.join(REPO, "datasets", "1_foto_mentah", "{tanggal}_scan_
 # disimpan, keputusan "tolak: bukan botol". Belt TETAP berhenti sampai bendanya diambil (selama belum ada jalur tolak servo).
 FOREIGN_ENABLE = True
 FOREIGN_IOU_BOTTLE = 0.3     # kotak non_bottle yang menumpang kotak botol (IoU >= ini) diabaikan
+# 28 Okt (kebijakan user: tolak yang benar > terima yang salah, KECUALI tolak karena noise): saat botol dipindai, bila ada
+# benda LAIN yang meyakinkan (terlihat di >= MULTI_MIN_FRAMES frame diam pada posisi sama) dan DEKAT botol (celah < MULTI_GAP x
+# panjang botol), botol DITOLAK 'lebih_dari_satu' (penyapu tak bisa memisahkan benda yang berdempetan).
+MULTI_ENABLE = True
+# 28 Okt (keluhan user di demo: botol 400 ml terbaca kecil): aturan ukuran AKTIF = 'panjang' (CATATAN §11: 25/26 vs luas 24/26).
+# Botol 400 ml luas ~221k (< batas 228k) tetapi panjang ~850 (>= 817) -> tanggung. Hari ini 16 botol lain sama dengan 'luas'.
+SIZE_RULE = "panjang"
+MULTI_MIN_FRAMES = 2
+MULTI_GAP = 0.25
 FOREIGN_WAIT_CLEAR = False   # 27 Okt (user): belt TETAP jalan agar benda terbawa ke pembuangan; True = tunggu benda diambil tangan
 FOREIGN_CONF = 0.60          # 27 Okt: noda bekas selotip di belt terbaca non_bottle 0,50 -> ambang 0,60 (data 22 Okt: 50/53 benda nyata >= 0,60)
 HOLD_MAX_SEC = 15.0          # pengaman mode tunggu: benda yang tetap terlihat > ini (mis. noda belt) -> belt jalan lagi
@@ -65,14 +74,16 @@ PRESENCE_MODE = "catat"
 #   SORTIR_TRAVEL_SEC  = waktu dari keputusan sampai botol tepat di bawah V (ukur: stopwatch dari belt jalan lagi setelah pindai)
 #   SORTIR_BUANG_EVERY = harus < (panjang V searah belt / kecepatan belt), agar tiap benda pasti kena satu sapuan
 SORTIR_ENABLE = True
-SORTIR_TRAVEL_SEC = 4.0
+SORTIR_TRAVEL_SEC = 3.0      # 28 Okt (user, setelah uji di mesin; 6,0 -> 5,2 -> 3,8 -> 3,0): botol diam di talang ~3 s belt jalan setelah pindai
 SORTIR_BUANG_EVERY = 1.5
-SORTIR_BUANG_PERIODIK = True # False = hanya sapuan terjadwal (benda tak terdeteksi TIDAK terbuang otomatis)
+SORTIR_BUANG_PERIODIK = False  # 28 Okt: alat tim = TALANG tilting (benda diam di talang) -> sapuan berkala tak perlu; diganti SORTIR_KOSONGKAN
+SORTIR_KOSONGKAN = False       # 28 Okt (user): MATI -- gerak BUANG sebelum TERIMA dianggap membingungkan. True = kosongkan talang ke BUANG
+                               # saat keputusan botol diterima (benda tak terdeteksi yang tertinggal di talang tidak ikut ke TERIMA)
 SORTIR_BUANG_TIKET = True    # benda yang ditolak juga dijadwalkan disapu ke BUANG saat tiba
-SORTIR_GUARD_SEC = 0.8       # tidak ada sapuan buang berkala dalam +-ini dari jadwal botol diterima
-SORTIR_SWEEP_SEC = 0.5       # lama V di sisi (servo bergerak + benda terlempar) sebelum kembali ke tengah
+SORTIR_GUARD_SEC = 1.4       # tidak ada sapuan buang berkala dalam +-ini dari jadwal botol diterima (28 Okt: >= siklus servo 1,2 s)
+SORTIR_SWEEP_SEC = 1.3       # 28 Okt: siklus firmware ESP32 TERUKUR 1,2 s (BUSY->DONE) + cadangan; selama ini tidak ada perintah baru
 SORTIR_LOG_BERKALA = False   # catat juga tiap sapuan buang berkala (konsol + SORTIR.csv); bawaan: hanya sapuan bertiket, berkala dihitung di panel
-SORTIR_SERIAL = os.environ.get("RVM_SORTIR_SERIAL", "")   # mis. "COM5" (laptop) / "/dev/ttyUSB0" (Nano); kosong = hanya dicatat
+SORTIR_SERIAL = os.environ.get("RVM_SORTIR_SERIAL", "COM7")   # 28 Okt: ESP32 tilting (CP2102) di laptop = COM7; tak ada -> hanya dicatat   # mis. "COM5" (laptop) / "/dev/ttyUSB0" (Nano); kosong = hanya dicatat
 SORTIR_BAUD = 115200
 
 # Folder PER SESI (27 Okt, permintaan user): <SCAN_SAVE_DIR tanggal>/sesi_<id>_<jamMulai>/ berisi frame + semua CSV sesi itu.
@@ -105,7 +116,8 @@ KANDIDAT = dict(bottle=os.path.join(_M, "botol_ver12_kandidat.pt"), liquid=os.pa
 # Sesi tidak berakhir karena diam 30 s, dan TIDAK membuat kode klaim (database poin/akun tidak terisi data percobaan).
 DATA_MODE = False
 DATA_IDLE_TIMEOUT = 3600     # sesi capturer berakhir sendiri hanya setelah 1 jam tanpa botol
-KELOMPOK_ISI = ("kosong", "air_bening", "berwarna", "campur", "bukan_botol")
+# 29 Okt: tingkat isi air bening (uji batas deteksi per tingkat isi; sesi 27 Okt diisi acak tanpa label tingkat)
+KELOMPOK_ISI = ("kosong", "air_1-6", "air_1-3", "air_1-2", "air_penuh", "air_bening", "berwarna", "campur", "bukan_botol")
 KELOMPOK_TUTUP = ("tanpa", "bertutup", "campur")
 
 
@@ -114,7 +126,7 @@ def harapan_kelompok(isi, tutup):
     '' = tidak bisa diharapkan (campur). bukan_botol: seharusnya tidak terpindai sama sekali."""
     if isi == "bukan_botol":
         return "bukan_botol"                                   # seharusnya ditolak dengan alasan 'bukan_botol' 
-    if tutup == "bertutup" or isi in ("air_bening", "berwarna"):
+    if tutup == "bertutup" or isi in ("air_bening", "berwarna") or isi.startswith("air_"):
         return "tolak"
     if isi == "kosong" and tutup == "tanpa":
         return "terima"
@@ -132,7 +144,8 @@ RECOVER_IDLE_SEC = 120       # sesi tanpa aktivitas selama ini yang belum ditutu
 # ---- poin (pengembangan: belum ada nilai rupiah asli) ----
 POINTS_BY_SIZE = {"kecil": 10, "tanggung": 15, "besar": 25}
 POINTS_UNKNOWN_SIZE = 10     # ukuran tak terbaca (botol terpotong tepi frame) -> poin terkecil
-BRAND_BONUS = 0              # bonus merek (whitelist Coca-Cola/Fanta/Sprite) BELUM aktif: model merek belum dikerjakan ulang
+BRAND_BONUS = 10             # 28 Okt (keputusan user, demo): +10 poin untuk botol DITERIMA yang terbaca produk Coca-Cola Company
+BRAND_MODEL = os.path.join(REPO, "datasets", "3_model_final", "merek_coca_v2_kandidat.pt")   # CV 104/107, salah bonus ~1/75 non-Coca
 # Perkiraan berat botol PET kosong per kategori (gram) untuk angka "plastik terselamatkan".
 GRAMS_BY_SIZE = {"kecil": 14, "tanggung": 20, "besar": 32, "?": 16}
 

@@ -22,7 +22,10 @@ import time
 
 from . import config
 
-POS_KODE = {"TERIMA": b"T\n", "BUANG": b"B\n", "TENGAH": b"N\n"}
+# Firmware tim `sortir_servo.ino` (ESP32, 28 Okt): "VALID" -> 15 deg (wadah TERIMA), "INVALID" -> 165 deg (BUANG), tahan 0,4 s lalu
+# KEMBALI SENDIRI ke 90 deg; balasan "BUSY x" / "DONE x" (terukur 1,2 s per siklus). Perintah saat sibuk diantre firmware.
+# TENGAH tidak dikirim (firmware kembali sendiri).
+POS_KODE = {"TERIMA": b"VALID\n", "BUANG": b"INVALID\n"}
 
 
 class Sortir(object):
@@ -35,6 +38,7 @@ class Sortir(object):
         self.balik_wall = None
         self.next_buang = config.SORTIR_BUANG_EVERY
         self.last_terima = None            # jam belt sapuan TERIMA terakhir (jendela aman sesudahnya)
+        self.buang_tiba = []               # jam tiba benda yang ditolak (aturan BUANG menang, 28 Okt)
         self.n = dict(terima=0, buang_tiket=0, buang_berkala=0, dilewati=0)
         self.terakhir = None
         self.ser = None
@@ -48,7 +52,10 @@ class Sortir(object):
             try:
                 import serial
                 self.ser = serial.Serial(config.SORTIR_SERIAL, config.SORTIR_BAUD, timeout=0.2)
-                print("[sortir] serial", config.SORTIR_SERIAL, "terbuka", flush=True)
+                t0 = time.time(); buf = b""                 # membuka port me-reset ESP32: tunggu 'READY' (boot ~2,3 s)
+                while time.time() - t0 < 4 and b"READY" not in buf:
+                    buf += self.ser.read(256)
+                print("[sortir] serial", config.SORTIR_SERIAL, "terbuka", "(READY)" if b"READY" in buf else "(tanpa READY!)", flush=True)
             except Exception as e:                   # tanpa serial: tetap jalan, perintah hanya dicatat
                 self.ser = None; print("[sortir] serial gagal:", e, flush=True)
         self._last = time.time()
@@ -72,6 +79,18 @@ class Sortir(object):
         jalur = "TERIMA" if b.get("decision") == "terima" else "BUANG"
         with self.lock:
             tiba = self.odo + config.SORTIR_TRAVEL_SEC
+            if jalur == "BUANG":
+                self.buang_tiba = [x for x in self.buang_tiba if x > self.odo - 10] + [tiba]
+            if jalur == "TERIMA" and config.SORTIR_KOSONGKAN:
+                # 28 Okt (talang tilting: benda DIAM di talang sampai dimiringkan): kosongkan talang ke BUANG sesaat sebelum botol
+                # sah mendarat, agar benda tak terdeteksi yang tertinggal di talang tidak ikut ke wadah TERIMA. Dilewati bila sudah
+                # ada sapuan terjadwal tepat sebelumnya (talang baru saja dikosongkan / botol sebelumnya masih diproses).
+                # 28 Okt (koreksi di mesin): DULU dijadwalkan tiba-1,5 s -> botol sudah mendarat lebih awal dan IKUT terbuang.
+                # KINI segera saat keputusan (botol masih di bawah kamera, jauh dari talang). Dilewati bila masih ada botol
+                # sebelumnya yang menunggu dimiringkan (tiket mana pun belum jalan) -> botol itu tidak ikut dibuang.
+                pre = self.odo
+                if not self.tiket:
+                    self.tiket.append(dict(odo_tiba=pre, jalur="BUANG", id=b.get("id"), alasan="kosongkan_talang"))
             if jalur == "TERIMA" or config.SORTIR_BUANG_TIKET:
                 self.tiket.append(dict(odo_tiba=tiba, jalur=jalur, id=b.get("id"), alasan=b.get("reason") or ""))
             self.terakhir = (b.get("id"), jalur, b.get("reason"))
@@ -108,7 +127,10 @@ class Sortir(object):
             sibuk = self.balik_wall is not None
             due = [t for t in self.tiket if t["odo_tiba"] <= self.odo]
             if due and not sibuk:
-                t = due[0]; self.tiket.remove(t)
+                t = min(due, key=lambda z: z["odo_tiba"]); self.tiket.remove(t)
+                if t["jalur"] == "TERIMA" and any(abs(x - t["odo_tiba"]) <= config.SORTIR_GUARD_SEC for x in self.buang_tiba):
+                    t["jalur"] = "BUANG"; t["alasan"] = "konflik_dekat_benda_tolak"   # wadah terima tetap bersih; poin pelanggan tetap
+                    print("[sortir] #%s TERIMA -> BUANG: tiba berdekatan dengan benda yang ditolak" % t.get("id"), flush=True)
                 aksi.append((t["jalur"], t, "tiket"))
                 if t["jalur"] == "TERIMA":
                     self.last_terima = self.odo
@@ -140,7 +162,8 @@ class Sortir(object):
             print("[sortir] V -> %s (%s%s) jam belt %.1f s" % (posisi, why, " #%s" % t["id"] if t else "", self.odo), flush=True)
         if self.ser is not None:
             try:
-                self.ser.write(POS_KODE[posisi])
+                if posisi in POS_KODE:
+                    self.ser.write(POS_KODE[posisi])
             except Exception as e:
                 print("[sortir] serial tulis gagal:", e, flush=True)
         if config.SCAN_SAVE_DIR and not self.sim and why != "kembali" and (why != "berkala" or config.SORTIR_LOG_BERKALA):

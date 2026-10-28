@@ -13,6 +13,7 @@ REASONS = {
     "cairan": ("Masih ada isinya", "Habiskan atau buang isinya dulu, lalu masukkan lagi."),
     "tutup_cairan": ("Masih bertutup dan masih ada isinya", "Habiskan atau buang isinya, lepas tutupnya, lalu masukkan lagi."),
     "leher": ("Leher botol tidak terlihat", "Baringkan botol di belt dengan leher menghadap samping, lalu coba lagi."),
+    "lebih_dari_satu": ("Lebih dari satu benda", "Ada benda lain menempel/berdekatan. Semua dibuang ke wadah tolak; masukkan botol satu per satu."),
     "bukan_botol": ("Bukan botol PET", "Benda ini dibuang ke wadah tolak. Mesin ini hanya menerima botol plastik PET."),
 }
 SIZE_TEXT = {"kecil": "Kecil", "tanggung": "Tanggung", "besar": "Besar", "?": "Ukuran tak terbaca"}
@@ -126,7 +127,7 @@ def decide(track, liquid_thr):
     else:
         reason = None
     ok = reason is None
-    pts = (config.POINTS_BY_SIZE.get(size, config.POINTS_UNKNOWN_SIZE) + config.BRAND_BONUS) if ok else 0
+    pts = config.POINTS_BY_SIZE.get(size, config.POINTS_UNKNOWN_SIZE) if ok else 0     # bonus merek ditambah di engine (per botol)
     out = dict(
         id=track.id, ts=time.time(), decision="terima" if ok else "tolak", reason=reason,
         size=size, size_text=SIZE_TEXT[size], points=pts, grams=config.GRAMS_BY_SIZE.get(size, 16) if ok else 0,

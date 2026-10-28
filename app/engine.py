@@ -13,7 +13,7 @@ import traceback
 import cv2
 
 from . import config
-from .tracker import Tracker, decide, decide_foreign, iou, center
+from .tracker import Tracker, decide, decide_foreign, iou, center, REASONS
 from .sortir import Sortir
 from .pencatat_benda import PencatatBenda
 
@@ -91,7 +91,7 @@ class Machine:
         self.jpeg = b""
         self._stop = threading.Event()
         self._last_stamp = ""
-        self.an2 = None; self.brand2 = None
+        self.an2 = None; self.brand2 = None; self.brand = None
         import queue
         self._shadow_q = queue.Queue()      # pekerjaan model kandidat (thread terpisah)
         self.batch = None                   # label kelompok aktif (kiosk capturer, --ambil-data)
@@ -138,8 +138,12 @@ class Machine:
             self.status, self.status_msg = "memuat", "memuat model %s (profil %s)..." % (self.backend, self.profile)
             self._push_state()
             from rvm_kp import RVMAnalyzer                 # impor berat (Ultralytics) hanya di mode nyata
-            self.an = RVMAnalyzer(self.backend, profile=self.profile)
+            self.an = RVMAnalyzer(self.backend, profile=self.profile, size_rule=config.SIZE_RULE)
             self._warmup()
+            if config.BRAND_BONUS and self.brand is None and os.path.exists(config.BRAND_MODEL):
+                from rvm_kp.merek import Merek
+                self.brand = Merek(config.BRAND_MODEL)
+                print("[merek] bonus +%d aktif:" % config.BRAND_BONUS, os.path.basename(config.BRAND_MODEL))
             if config.SHADOW and self.an2 is None:
                 if self.backend != "pytorch":
                     print("[kandidat] dilewati: model kandidat bayangan hanya untuk backend pytorch")
@@ -231,6 +235,11 @@ class Machine:
                         if results:
                             self.session["last_seen"] = now
                         for t in done:
+                            if config.STOP_SCAN and not self.sim and not getattr(t, "scanned", False):
+                                # 28 Okt: jejak yang TIDAK pernah dipindai diam (mis. jejak ganda botol yang sama, nilai dari frame
+                                # buram saat belt jalan) tidak diputuskan/ditampilkan; benda nyata tetap tersapu BUANG berkala.
+                                print("[scan] #%d dilewati: tidak dipindai saat berhenti (%d suara bergerak)" % (t.id, len(t.votes)), flush=True)
+                                continue
                             self._record(decide(t, self.liquid_thr))
                         for t in done2:                             # tanpa berhenti-lalu-pindai (sim / --terus)
                             if not getattr(t, "scanned", False):
@@ -270,7 +279,7 @@ class Machine:
         t.scanned = True; t0 = time.time()
         plc_ok = self.conveyor.run(False) if self.conveyor.enabled else None
         self._stop.wait(config.STOP_SETTLE_SEC)
-        votes = []; frames = []
+        votes = []; frames = []; lain = []                      # lain: kotak benda LAIN per frame diam (botol lain / bukan botol)
         for _ in range(config.STOP_FRAMES):
             if self._stop.is_set() or self.session is None or time.time() - t0 > config.STOP_MAX_SEC:
                 break
@@ -281,6 +290,9 @@ class Machine:
                 (cx, cy), (tx, ty) = center(r.box), center(t.box)
                 if iou(r.box, t.box) >= 0.2 or ((cx - tx) ** 2 + (cy - ty) ** 2) ** 0.5 < 0.5 * size:
                     votes.append(r); t.box, t.cur, t.last = r.box, r, time.time()
+                    lain.append([x.box for x in res if x is not r] + [x.box for x in self._foreign_results(res)])
+                else:
+                    lain.append([])
             self._preview(f, True)
         t_scan = time.time() - t0
         if self.conveyor.enabled and self.session is not None:      # sesi sudah ditutup saat memindai: jangan jalankan lagi
@@ -292,6 +304,19 @@ class Machine:
         t.votes = [(r.cap, r.cap_conf, r.p_liquid, r.size, r.area_1920) for r in votes]
         t.decided = True
         b = decide(t, self.liquid_thr); b["mode"] = "berhenti"; b["stop_sec"] = round(t_scan, 2)
+        multi = self._benda_lain(t.box, lain, frames[0].shape) if config.MULTI_ENABLE and frames else None
+        if multi is not None:
+            b.update(decision="tolak", reason="lebih_dari_satu", points=0, grams=0)
+            b["reason_text"], b["tip"] = REASONS["lebih_dari_satu"]
+            print("[scan] #%d DITOLAK: benda lain dekat botol di %d frame diam" % (t.id, multi), flush=True)
+        if self.brand is not None and b["decision"] == "terima":           # bonus merek (frame diam yang sama)
+            try:
+                pc = self.brand.p_coca(frames, t.box)
+                if pc is not None and pc >= self.brand.thr:
+                    b["points"] += config.BRAND_BONUS; b["bonus_merek"] = config.BRAND_BONUS
+                print("[merek] #%d p_coca %.2f%s" % (t.id, pc or 0, " -> bonus +%d" % config.BRAND_BONUS if b.get("bonus_merek") else ""), flush=True)
+            except Exception as e:
+                print("[merek] gagal:", e)
         self._tag(b)
         self._save_scan(t, b, frames, votes)
         if self.an2 is not None:
@@ -300,6 +325,25 @@ class Machine:
         return b
 
     # ------------------------------------------------------------------ benda bukan botol
+    def _benda_lain(self, box, lain, shape=(720, 1280)):
+        """Benda lain yang MEYAKINKAN dan DEKAT botol: kotak yang muncul di posisi sama (IoU>=0,5) pada >= MULTI_MIN_FRAMES frame
+        diam (noise/kilatan biasanya tidak konsisten) dan celahnya ke kotak botol < MULTI_GAP x panjang botol. Kembalikan jumlah
+        frame tempat benda itu terlihat, atau None."""
+        L = max(box[2] - box[0], box[3] - box[1]); g = config.MULTI_GAP * L
+        H, W = shape[:2]; z0, z1 = config.ZONE_X[0] * W, config.ZONE_X[1] * W
+        dekat = lambda o: (max(0, max(o[0], box[0]) - min(o[2], box[2])) <= g and max(0, max(o[1], box[1]) - min(o[3], box[3])) <= g)
+        for i, fr in enumerate(lain):
+            for o in fr:
+                c = ((o[0] + o[2]) / 2, (o[1] + o[3]) / 2)
+                if iou(o, box) >= 0.3 or (box[0] <= c[0] <= box[2] and box[1] <= c[1] <= box[3]) or not dekat(o):
+                    continue                                   # kotak ganda/sebagian botol yang sama, atau benda jauh
+                if not (z0 <= c[0] <= z1) or o[0] <= 3 or o[1] <= 3 or o[2] >= W - 3 or o[3] >= H - 3:
+                    continue                                   # 28 Okt: di luar zona periksa / terpotong tepi frame (benda di luar belt)
+                n = 1 + sum(any(iou(o, p) >= 0.5 for p in lain[j]) for j in range(len(lain)) if j != i)
+                if n >= config.MULTI_MIN_FRAMES:
+                    return n
+        return None
+
     def _foreign_results(self, results):
         """Kotak non_bottle frame ini yang tidak menumpang kotak botol."""
         nb = getattr(self.an, "last_nonbottle", None) or []
@@ -427,7 +471,10 @@ class Machine:
             z0, z1 = int(config.ZONE_X[0] * w), int(config.ZONE_X[1] * w)
             for x in (z0, z1):
                 cv2.line(f, (x, 0), (x, h), (200, 210, 200), 2, cv2.LINE_AA)
+            bb = [t.cur.box for t in self.tracker.tracks]
             for t in self.tracker2.tracks:
+                if any(iou(t.box, b) >= config.FOREIGN_IOU_BOTTLE for b in bb):   # 28 Okt: kotak dobel di botol (diabaikan keputusan) tak digambar
+                    continue
                 x1, y1, x2, y2 = [int(v) for v in t.box]
                 cv2.rectangle(f, (x1, y1), (x2, y2), CORAL, 4, cv2.LINE_AA)
                 lab = "#%d BUKAN BOTOL%s" % (t.id, " - AMBIL" if self.hold else "")

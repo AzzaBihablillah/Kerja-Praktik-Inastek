@@ -70,7 +70,7 @@
       var f = st.terbaru;
       $('feed').innerHTML = f.length ? f.slice(0, 5).map(function (b, i) {
         var ok = b.decision === 'terima';
-        var t = ok ? 'Botol ' + b.size + ' diterima · +' + b.points : 'Ditolak: ' + ({ tutup: 'masih bertutup', cairan: 'masih berisi', tutup_cairan: 'bertutup & berisi', leher: 'leher tak terlihat' }[b.reason] || 'tidak sah');
+        var t = ok ? 'Botol ' + b.size + ' diterima · +' + b.points + (b.bonus_merek ? ' (termasuk bonus Coca-Cola)' : '') : 'Ditolak: ' + ({ tutup: 'masih bertutup', cairan: 'masih berisi', tutup_cairan: 'bertutup & berisi', leher: 'leher tak terlihat', lebih_dari_satu: 'lebih dari satu benda' }[b.reason] || 'tidak sah');
         return '<li style="animation-delay:' + (i * 0.06) + 's"><span class="fi' + (ok ? '' : ' bad') + '">' + ic(ok ? 'check' : 'x') + '</span><span class="ft">' + esc(t) + '</span><time>' + ago(b.ts) + '</time></li>';
       }).join('') : '<li class="empty">Belum ada botol yang masuk. Aktivitas setor akan muncul di sini.</li>';
       setMachine(d.mesin);
@@ -124,7 +124,7 @@
     v.className = 'verdict ' + (ok ? 'ok' : 'bad');
     v.innerHTML = '<span class="v-ic">' + ic(ok ? 'check' : (b.reason === 'tutup' || b.reason === 'tutup_cairan' ? 'cap' : b.reason === 'cairan' ? 'drop' : 'x')) + '</span>' +
       '<div class="v-t"><b>' + esc(ok ? 'Diterima. Botol ' + b.size_text.toLowerCase() + '.' : b.reason_text) + '</b><span>' +
-      esc(ok ? 'Terima kasih. Lanjutkan botol berikutnya.' : b.tip) + '</span></div>' + (ok ? '<span class="v-pts">+' + b.points + '</span>' : '');
+      esc(ok ? (b.bonus_merek ? 'Bonus produk Coca-Cola +' + b.bonus_merek + '. ' : '') + 'Terima kasih. Lanjutkan botol berikutnya.' : b.tip) + '</span></div>' + (ok ? '<span class="v-pts">+' + b.points + '</span>' : '');
     void v.offsetWidth; v.classList.add('show');
     clearTimeout(S.verdictTimer);
     S.verdictTimer = setTimeout(function () { v.classList.remove('show'); }, ok ? 2600 : 4200);
