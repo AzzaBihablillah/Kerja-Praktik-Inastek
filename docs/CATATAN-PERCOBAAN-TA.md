@@ -460,11 +460,53 @@ Data: `datasets/1_foto_mentah/2026-10-29_scan_app/` (sesi_105 salah label -> dip
 **Kurva tingkat isi (sementara, Coca-Cola, bertutup):** air terdeteksi RH ±1/2 = 92% -> ±1/6 = 60%; kandidat 76% -> 20%. Batas deteksi andal terletak antara 1/6 dan 1/2 (perlu ±1/3); pada ±1/6 skor RH menyebar 0,00–1,00 (tidak ada ambang yang memisahkan). Keputusan akhir tetap benar karena tertolong tutup; air ±1/6 TANPA tutup akan lolos ~40% (RH).
 **Keputusan user (29 Okt):** tingkat isi cukup ±1/2 dan ±1/6 (tanpa ±1/3); cairan dinilai dari skor isi saja (tutup DIABAIKAN dalam evaluasi cairan, hasil tutup menjadi bahan latih ulang model tutup). Sisa: sesi non-Coca air ±1/2 dan ±1/6.
 
-- **Isi (botol kosong tanpa tutup, 75):** aktif RH diterima 71/75 = 94,7% [87–98] (4 botol kosong dikira berisi, skor 0,59–0,90); kandidat cairan_berisi 100/100 botol kosong terbaca kosong (skor 0,0).
+- **Isi (botol kosong tanpa tutup, 75):** aktif RH diterima 71/75 = 94,7% [87–98] (4 botol kosong dikira berisi, skor 0,59–0,90); kandidat cairan_berisi 150/150 botol kosong terbaca kosong (skor 0,0). Total botol kosong = 150: 75 tanpa tutup (sesi 107–109) + 75 bertutup (sesi 106 tutup asli 25/25 tertolak, sesi 110 tutup campuran 44/50) -> bertutup tertolak 69/75 = 92%.
 - **Tutup campuran (sesi 110):** 6 botol bertutup LOLOS (0/3 frame melihat tutup, satu 1/3): pola dari foto = tutup kemungkinan beda warna dgn cincin (#174, #207, #244), tutup biru tua (#171, #173), botol miring di belt (#238); tetapi tutup tukaran tidak selalu lolos (#180 biru muda di cincin merah tertolak benar). Penguji tidak mencatat botol mana yang ditukar -> dievaluasi umum (tutup sama + beda warna), data menjadi bahan latih ulang model tutup (perlu audit kotak leher/tutup).
-- **Detektor kandidat ver12 + model tutup:** sesi 106: 4 botol tidak terdeteksi + 3 botol bertutup diterima; sesi 110: 2 tidak terdeteksi, 7 diterima -> kekhawatiran L-28 terbukti: kotak ver12 mengganggu tutup; ver9c tetap aktif.
-- **Merek v2 pada botol BARU (bonus aktif):** Coca-Cola tanpa tutup dikenali 19/25 = 76,0% [57–89]; Coca-Cola bertutup 11/25 = 44,0% [27–63]; non-Coca salah dapat bonus 7/40 = 17,5% [9–32] -> jauh di bawah CV (97%): model merek belum menggeneralisasi ke botol baru; keputusan user: bonus tetap aktif, kesalahan menjadi bahan evaluasi & latih ulang.
+- **[TIDAK SAHIH — bug bayangan, lihat L-32]** **Detektor kandidat ver12 + model tutup:** sesi 106: 4 botol tidak terdeteksi + 3 botol bertutup diterima; sesi 110: 2 tidak terdeteksi, 7 diterima -> kekhawatiran L-28 terbukti: kotak ver12 mengganggu tutup; ver9c tetap aktif.
+- **[TIDAK SAHIH — bug bayangan, lihat L-32; merek v2 offline: Coca 108/109, non-Coca bonus salah 10/225]** **Merek v2 pada botol BARU (bonus aktif):** Coca-Cola tanpa tutup dikenali 19/25 = 76,0% [57–89]; Coca-Cola bertutup 11/25 = 44,0% [27–63]; non-Coca salah dapat bonus 7/40 = 17,5% [9–32] -> jauh di bawah CV (97%): model merek belum menggeneralisasi ke botol baru; keputusan user: bonus tetap aktif, kesalahan menjadi bahan evaluasi & latih ulang.
 - Insiden: venv proyek sempat dibuat ulang dengan Python 3.14 (`python -m venv venv`, langkah untuk laptop teman) -> app gagal start (pydantic_core cp313); dipulihkan ke Python 3.13 tanpa menghapus paket.
+
+### L-32 Latih ulang isi, tutup, merek dengan data belt 27 + 29 Okt; bug kandidat bayangan (29 Okt malam)
+**Desain validasi (semua model): PER HARI** — model dilatih TANPA satu hari belt lalu diuji pada hari itu (A29: latih data lama + 27 Okt, uji 29 Okt; B27: latih lama + 29 Okt, uji 27 Okt). Botol uji tidak pernah dilihat saat latih. Per botol: isi = median 3 frame diam (ambang 0,5), merek = rata-rata, tutup = suara mayoritas 3 frame. Rentang = Wilson 95%. Model final = latih SEMUA data (lama + 27 + 29), disimpan sebagai `*_kandidat.pt`; model aktif TIDAK diganti tanpa keputusan user.
+
+**Isi cairan v3** (`scripts/pipeline_cairan/s37_isi_29okt.py`, yolov8n-cls 224; data 351 baris lama + 321 frame 27 Okt + 1085 frame 29 Okt, 3 salinan geser-hue; final `cairan_isi_v3_kandidat.pt`):
+
+| uji (hari tak dilatih) | RH aktif | s35 (cairan_berisi) | **v3** |
+|---|---|---|---|
+| 29 Okt kosong (75 bertutup + 75 tanpa) | 122/150 = 81,3% [74–87] | 150/150 | **149/150 = 99,3% [96–100]** |
+| 29 Okt air ±1/2 | 72/75 = 96,0% [89–99] | 71/75 | **73/75 = 97,3% [91–99]** |
+| 29 Okt air ±1/6 | 60/75 = 80,0% [70–87] | 39/75 | **66/75 = 88,0% [79–94]** |
+| 29 Okt air penuh | 52/62 = 83,9% [73–91] | 26/62 | **53/62 = 85,5% [75–92]** |
+| 27 Okt air acak | 31/35 = 88,6% [74–95] | 27/35 | **33/35 = 94,3% [81–98]** |
+| 27 Okt kosong | 57/72 = 79,2% [68–87] | 69/72 | **67/72 = 93,1% [85–97]** |
+
+Temuan: v3 mempertahankan kepekaan RH terhadap air (bahkan naik di ±1/6) SEKALIGUS hampir menghilangkan salah-tolak botol kosong (RH menolak 28/150 botol kosong 29 Okt sebagai berisi; v3 hanya 1). Trade-off RH (peka tapi banyak salah tolak) vs s35 (bersih tapi buta air sedikit) terselesaikan oleh data belt berlabel tingkat isi. Air penuh tetap paling sulit (~85%), konsisten dengan dugaan L-31 (model membaca batas air–udara). Catatan: angka RH di sini (potongan ulang offline, kotak ver9c) sedikit berbeda dari angka langsung L-31 (mis. ±1/6 60 vs 57) karena potongan & frame tidak identik.
+
+**Merek v3** (`scripts/pipeline_merek/m09_belt29.py`, 256 px; sesi tutup-campur tidak dipakai): uji 29 Okt (334 botol) — m08/v2 dan v3 sama-sama 323/334; Coca-Cola dikenali **108/109 = 99,1% [95–100]**, non-Coca salah dapat bonus **10/225 = 4,4% [2–8]** (m07 lama: 17/225 = 7,6%); uji 27 Okt — v2 107/107, v3 (fold B27) 105/107. Kesimpulan: v2 sudah menggeneralisasi ke botol 29 Okt; v3 tidak memberi tambahan berarti. Final `merek_coca_v3_kandidat.pt` disimpan, rekomendasi tetap v2.
+
+**Tutup v3** (`scripts/pipeline_cap/cap_v3_belt.py`; 397 foto cap_belt_v2 + frame belt 27 & 29 Okt, kotak leher dari usulan cap_belt_v2 yang DIAUDIT user, kelas dari label sesi; imgsz 960; final `cap_belt_v3_kandidat.pt`). Per botol (mayoritas 3 frame), bertutup benar / tanpa tutup benar:
+
+| uji | mode | v2 aktif | v3 |
+|---|---|---|---|
+| 29 Okt (tutup ditukar ikut) | ROI (cara app) | 242/287, 72/75 | 226/287, 73/75 |
+| 29 Okt | full frame | 252/287, 75/75 | 263/287, 75/75 |
+| 27 Okt | ROI | 69/73, 32/34 | 67/73, 30/34 |
+| 27 Okt | full frame | 72/73, 34/34 | 73/73, 33/34 |
+
+Per frame, v3 lebih lemah di mode ROI tetapi lebih kuat di full frame -> metrik per frame saja tidak cukup; penentu = simulasi keputusan di bawah.
+
+**Simulasi ulang keputusan mesin** (`scripts/alat/replay_keputusan.py`; frame diam tersimpan, profil nano, `app.tracker.decide`, model baru per hari = model yang TIDAK melihat hari itu; benar = keputusan sesuai harapan label kelompok):
+
+| varian | 27 Okt (107) | 29 Okt (362) | gabungan | salah terima | salah tolak |
+|---|---|---|---|---|---|
+| aktif (ver9c + cap v2 + RH) | 101 | 348 | 449/469 = 95,7% | 12 | 8 |
+| tutup baru saja | 101 | 354 | 455/469 | 6 | 8 |
+| isi baru saja | 104 | 353 | 457/469 | 11 | 1 |
+| **semua baru (cap v3 + isi v3)** | **104** | **357** | **461/469 = 98,3%** | **7** | **1** |
+
+Isi v3 menghapus hampir semua salah tolak botol kosong (8 -> 1, sesuai prinsip "jangan rugikan customer karena noise"); tutup v3 memangkas botol bertutup yang lolos di 29 Okt (salah terima 10 -> 4), netral di 27 Okt. Sisa salah terima = botol bertutup dengan tutup tak terlihat (sebagian tutup ditukar warna). **Diaktifkan 30 Okt atas persetujuan user** (`rvm_kp/config.py MODEL_SETS`: `cap_belt_v3_kandidat` + `cairan_isi_v3_kandidat`; detektor ver9c & merek v2 tetap). Tidak perlu uji belt baru untuk keputusan ini: semua angka dari botol yang tidak dilatih.
+
+**KOREKSI L-31 — bug kandidat bayangan (ditemukan 29 Okt malam saat memeriksa merek):** pekerja asinkron kandidat bayangan di `app/engine.py` membaca `t.box` (kotak track) SAAT DIPROSES, padahal track sudah bergerak/diperbarui -> potongan merek/isi/tutup kandidat diambil dari posisi yang salah. Akibatnya SEMUA angka kandidat langsung 27–29 Okt tidak sahih: merek v2 "76% / 44% / 17,5%", isi kandidat langsung, dan klaim "ver12 mengganggu tutup" di L-31. Perbaikan: kotak dibekukan saat masuk antrian (`_shadow_q.put((t, frames, plc_ok, b, tuple(t.box)))`). Jalur AKTIF tidak terdampak (bonus aktif terverifikasi: Coca 23/23 dapat bonus, non-Coca 2/48). Angka merek yang sahih = validasi offline di atas.
 
 ### L-9 Model final
 `datasets/4_eksperimen/cairan/final/` (belt W16 + C13) dan `final2/` (+ pilot dan 28 foto tambahan). Keduanya tidak punya uji bersih; akurasi = hasil CV di atas. Belum dipasang di server (lingkup Capstone 1).
@@ -560,6 +602,8 @@ Peta lengkap dengan proporsi per model: `PETA-DATASET-19-OKT.md`. Temuan utama: 
 7. Bug pengunduhan TACO: file 0 byte dari `open(..., 'wb')` sebelum `urlopen`; dihapus dan diunduh ulang.
 8. Data warisan dan data luar semula diharapkan membantu; hasilnya memperburuk (L-7), dan tercatat apa adanya.
 9. **(23 Okt, ditemukan bersama user)** Percobaan data luar Open Food Facts (s14, L-7) memakai label OTOMATIS dari kategori produk tanpa audit manusia: label 'kosong' ternyata = botol PENUH air bening, ada pula teh/minuman berwarna berlabel 'kosong'. Sebagian alasan "data luar memperburuk" adalah label yang salah, bukan hanya beda sumber foto. Audit visual 92 potongan bersih oleh user (halaman validasi, 2 putaran tinjau): 14 berwarna, 15 air bening, 4 kosong (semua berlabel/berbahan berwarna), 59 buang. Pelajaran audit: (a) posisi botol menentukan (botol REBAH berisi sebagian = realistis seperti belt; botol BERDIRI berisi sebagian = garis cairan melintang, tidak realistis); (b) botol berbahan plastik berwarna (Mizone, botol teh hijau) — warna dari plastik, bukan cairan; (c) yang ragu dibuang agar tidak bias.
+
+10. **(29 Okt malam)** Angka kandidat bayangan langsung 27–29 Okt (merek v2 76%/44%/17,5%; ver12 "mengganggu tutup"; isi kandidat) tidak sahih karena bug kotak bergerak di pekerja asinkron (L-32). Diganti validasi offline per hari.
 
 ## 8. Keterbatasan
 - W16 hanya 5 botol, satu sesi, satu pencahayaan, foto statis; Fanta Grape belum ada; pemilahan data warisan belum divalidasi manusia.

@@ -14,12 +14,16 @@ CAP_ROI_IMGSZ = 416           # kanvas potongan area botol (uji setelan 21 Okt m
 CAP_ROI_SCALE = 1 / 2         # skala potongan relatif frame selebar 1920 px (= skala latih model tutup, imgsz 960)
 CAP_ROI_MARGIN = 0.08         # tambahan tepi kotak botol (fraksi lebar/tinggi kotak)
 
+# 30 Okt (persetujuan user): tutup v3 + isi v3, latih ulang dgn data belt 27 + 29 Okt (CATATAN L-32; simulasi keputusan
+# 449 -> 461/469). Kembali ke set lama: cap_belt_v3_kandidat -> cap_belt_v2, cairan_isi_v3_kandidat -> cairan_RH.
+# tensorrt: engine v3 BELUM dibuat -> buat ulang di Nano (rvm_kp.export_models --format engine --half --only ...).
+_CAP, _ISI = "cap_belt_v3_kandidat", "cairan_isi_v3_kandidat"
 MODEL_SETS = {
-    "pytorch": dict(bottle=f"{M}/botol_ver9c.pt", cap=f"{M}/cap_belt_v2.pt", cap_roi=f"{M}/cap_belt_v2.pt", liquid=f"{M}/cairan_RH.pt"),
-    "onnx": dict(bottle=f"{E}/botol_ver9c.onnx", cap=f"{E}/cap_belt_v2.onnx", cap_roi=f"{E}/cap_belt_v2_roi.onnx", liquid=f"{E}/cairan_RH.onnx"),
-    "openvino": dict(bottle=f"{E}/botol_ver9c_openvino_model", cap=f"{E}/cap_belt_v2_openvino_model",
-                     cap_roi=f"{E}/cap_belt_v2_roi_openvino_model", liquid=f"{E}/cairan_RH_openvino_model"),
-    "tensorrt": dict(bottle=f"{E}/botol_ver9c.engine", cap=f"{E}/cap_belt_v2.engine", cap_roi=f"{E}/cap_belt_v2_roi.engine", liquid=f"{E}/cairan_RH.engine"),
+    "pytorch": dict(bottle=f"{M}/botol_ver9c.pt", cap=f"{M}/{_CAP}.pt", cap_roi=f"{M}/{_CAP}.pt", liquid=f"{M}/{_ISI}.pt"),
+    "onnx": dict(bottle=f"{E}/botol_ver9c.onnx", cap=f"{E}/{_CAP}.onnx", cap_roi=f"{E}/{_CAP}_roi.onnx", liquid=f"{E}/{_ISI}.onnx"),
+    "openvino": dict(bottle=f"{E}/botol_ver9c_openvino_model", cap=f"{E}/{_CAP}_openvino_model",
+                     cap_roi=f"{E}/{_CAP}_roi_openvino_model", liquid=f"{E}/{_ISI}_openvino_model"),
+    "tensorrt": dict(bottle=f"{E}/botol_ver9c.engine", cap=f"{E}/{_CAP}.engine", cap_roi=f"{E}/{_CAP}_roi.engine", liquid=f"{E}/{_ISI}.engine"),
 }
 
 # Detektor botol: botol_ver9c (22 Okt; uji NYATA di belt: non-botol diterima 7/32 vs ver8b 13/32, kontrol PET 64/64 keduanya).

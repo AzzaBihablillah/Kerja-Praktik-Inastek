@@ -109,10 +109,10 @@ class Machine:
         """Pekerja antrean model kandidat, terpisah dari loop kamera (belt sudah jalan lagi saat ini bekerja)."""
         while not self._stop.is_set():
             try:
-                t, frames, plc_ok, b = self._shadow_q.get(timeout=0.5)
+                t, frames, plc_ok, b, box = self._shadow_q.get(timeout=0.5)
             except Exception:
                 continue
-            self._shadow(t, frames, plc_ok, b)
+            self._shadow(t, frames, plc_ok, b, box)
             with self.lock:
                 b["_kandidat_selesai"] = True
                 if b.get("_dihitung_aktif"):                 # botol sudah tercatat lebih dulu -> lengkapi hitungan kandidat
@@ -321,7 +321,9 @@ class Machine:
         self._save_scan(t, b, frames, votes)
         if self.an2 is not None:
             b["_kandidat_tertunda"] = True
-            self._shadow_q.put((t, frames, plc_ok, b))             # dikerjakan pekerja; loop kamera langsung lanjut
+            # 29 Okt (BUG): kotak DIBEKUKAN saat frame diam; dulu pekerja memakai t.box yang sudah bergeser karena belt jalan lagi
+            # -> potongan merek/kandidat meleset (p_coca live 0,02 vs ulang 1,00). Hanya catatan kandidat yang terdampak.
+            self._shadow_q.put((t, frames, plc_ok, b, tuple(t.box)))  # dikerjakan pekerja; loop kamera langsung lanjut
         return b
 
     # ------------------------------------------------------------------ benda bukan botol
@@ -405,15 +407,16 @@ class Machine:
                 self.conveyor.run(True)
             print("[asing] #%d sudah diambil, belt jalan lagi (ditahan %.0f s)" % (h["id"], now - h["since"]), flush=True)
 
-    def _shadow(self, t, frames, plc_ok, b=None):
+    def _shadow(self, t, frames, plc_ok, b=None, box=None):
         """Model kandidat menilai frame diam yang sama; hasil hanya dicatat (SCAN_KANDIDAT.csv), tidak memengaruhi layar/poin."""
+        box = box if box is not None else tuple(t.box)
         try:
             vv = []
             for f in frames:
                 res = self.an2.analyze(f)
                 if res:
-                    r = max(res, key=lambda r: iou(r.box, t.box))
-                    if iou(r.box, t.box) >= 0.2:
+                    r = max(res, key=lambda r: iou(r.box, box))
+                    if iou(r.box, box) >= 0.2:
                         vv.append(r)
 
             class _T(object):
@@ -423,7 +426,7 @@ class Machine:
             pc = ""                                       # merek: kotak botol model AKTIF (seperti data latih: ver9c), rata-rata frame diam
             if self.brand2 is not None:
                 try:
-                    pc = round(self.brand2.p_coca(frames, t.box), 3)
+                    pc = round(self.brand2.p_coca(frames, box), 3)
                 except Exception as e:
                     print("[kandidat] merek gagal:", e)
             hk = b.get("harapan", "") if b else ""

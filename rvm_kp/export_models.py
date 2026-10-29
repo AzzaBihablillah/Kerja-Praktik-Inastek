@@ -14,6 +14,12 @@ MODELS = {
     "cap_belt_v2_roi": (f"{M}/cap_belt_v2.pt", CAP_ROI_IMGSZ),
     "cairan_RH": (f"{M}/cairan_RH.pt", IMGSZ_LIQUID),
     "merek_coca_kandidat": (f"{M}/merek_coca_kandidat.pt", 256),   # bonus merek coca_cola (kandidat 24 Okt, rvm_kp/merek.py)
+    # kandidat latih ulang data belt 27 & 29 Okt (BELUM aktif; aktif hanya atas keputusan user)
+    "cairan_isi_v3_kandidat": (f"{M}/cairan_isi_v3_kandidat.pt", IMGSZ_LIQUID),
+    "merek_coca_v2_kandidat": (f"{M}/merek_coca_v2_kandidat.pt", 256),
+    "merek_coca_v3_kandidat": (f"{M}/merek_coca_v3_kandidat.pt", 256),
+    "cap_belt_v3_kandidat": (f"{M}/cap_belt_v3_kandidat.pt", IMGSZ_CAP_FULL),
+    "cap_belt_v3_kandidat_roi": (f"{M}/cap_belt_v3_kandidat.pt", CAP_ROI_IMGSZ),
 }
 
 
