@@ -21,6 +21,12 @@ VARIAN = {  # gabungan per komponen, agar terlihat sumber perbaikan
     "tutup_baru": lambda h: dict(AKTIF, cap=BARU[h]["cap"], cap_roi=BARU[h]["cap_roi"]),
     "isi_baru": lambda h: dict(AKTIF, liquid=BARU[h]["liquid"]),
     "semua_baru": lambda h: BARU[h],
+    # 30 Okt: set AKTIF di aplikasi (rvm_kp MODEL_SETS, model FINAL yang sudah melihat 27 & 29 Okt) -> hanya untuk mencocokkan
+    # aplikasi utuh (uji_app_putar) dengan simulasi ini, BUKAN ukuran akurasi
+    "aktif_final": lambda h: __import__("rvm_kp.config", fromlist=["x"]).MODEL_SETS["pytorch"],
+    # 30 Okt: model tutup v4w (latih + salinan warna tutup buatan yang diaudit user), isi v3 per hari
+    "tutup_warna": lambda h: dict(BARU[h], cap=f"{DS}/4_eksperimen/cap/_cap_v4w/runs/cv_{'A29' if h == '29' else 'B27'}/weights/last.pt",
+                                  cap_roi=f"{DS}/4_eksperimen/cap/_cap_v4w/runs/cv_{'A29' if h == '29' else 'B27'}/weights/last.pt"),
 }
 
 

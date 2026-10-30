@@ -151,8 +151,11 @@ class Machine:
                     import sys as _sys
                     rc = _sys.modules[type(self.an).__module__.rsplit(".", 1)[0] + ".config"]
                     ms = dict(rc.MODEL_SETS["pytorch"], bottle=config.KANDIDAT["bottle"], liquid=config.KANDIDAT["liquid"])
+                    if config.KANDIDAT.get("cap"):                # 30 Okt: model tutup kandidat (mis. v4w warna buatan)
+                        ms.update(cap=config.KANDIDAT["cap"], cap_roi=config.KANDIDAT["cap"])
                     self.an2 = RVMAnalyzer("pytorch", models=ms, profile=self.profile, size_rule=config.KANDIDAT["size_rule"])
-                    print("[kandidat] aktif (bayangan):", os.path.basename(ms["bottle"]), os.path.basename(ms["liquid"]), "ukuran", config.KANDIDAT["size_rule"])
+                    print("[kandidat] aktif (bayangan):", os.path.basename(ms["bottle"]), os.path.basename(ms["cap"]), os.path.basename(ms["liquid"]),
+                          "ukuran", config.KANDIDAT["size_rule"])
                     if config.KANDIDAT.get("brand") and os.path.exists(config.KANDIDAT["brand"]):
                         from rvm_kp.merek import Merek
                         self.brand2 = Merek(config.KANDIDAT["brand"])

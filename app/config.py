@@ -104,10 +104,12 @@ def scan_dir():
 # Hanya backend pytorch (berkas .pt kandidat). Menambah waktu berhenti (~2x analisis).
 SHADOW = False
 _M = os.path.join(REPO, "datasets", "3_model_final")
-# 28 Okt (persetujuan user): detektor ver12 & merek v2 (latih + data belt 27 Okt); cairan tetap s35 (v2 dinilai offline)
-KANDIDAT = dict(bottle=os.path.join(_M, "botol_ver12_kandidat.pt"), liquid=os.path.join(_M, "cairan_berisi_kandidat.pt"), size_rule="panjang",
-                # merek (24 Okt): coca_cola vs non_coca_cola, resep A (foto belt saja), dinilai pada kotak botol model AKTIF; bonus tetap 0
-                brand=os.path.join(_M, "merek_coca_v2_kandidat.pt"))
+# 30 Okt (persetujuan user): bayangan untuk sesi belt berikutnya = SAMA dengan set aktif kecuali MODEL TUTUP -> beda keputusan
+# kandidat vs aktif hanya berasal dari tutup v4w (warna tutup buatan, CATATAN L-33: lulus 29 Okt, gagal 27 Okt; perlu uji botol baru).
+# Set lama (28 Okt): bottle=botol_ver12_kandidat, liquid=cairan_berisi_kandidat, brand=merek_coca_v2_kandidat.
+KANDIDAT = dict(bottle=os.path.join(_M, "botol_ver9c.pt"), liquid=os.path.join(_M, "cairan_isi_v3_kandidat.pt"),
+                cap=os.path.join(_M, "cap_belt_v4w_kandidat.pt"), size_rule="panjang",
+                brand=None)                     # merek kandidat dimatikan: sama dengan aktif (v2), hemat waktu
 
 # ---- mode KIOSK CAPTURER / ambil data (24 Okt, `--ambil-data`) ----
 # Mesin dipakai seperti biasa (berhenti-lalu-pindai, poin tampil) sambil mengumpulkan data belt nyata.
@@ -118,7 +120,10 @@ DATA_MODE = False
 DATA_IDLE_TIMEOUT = 3600     # sesi capturer berakhir sendiri hanya setelah 1 jam tanpa botol
 # 29 Okt: tingkat isi air bening (uji batas deteksi per tingkat isi; sesi 27 Okt diisi acak tanpa label tingkat)
 KELOMPOK_ISI = ("kosong", "air_1-6", "air_1-3", "air_1-2", "air_penuh", "air_bening", "berwarna", "campur", "bukan_botol")
-KELOMPOK_TUTUP = ("tanpa", "bertutup", "campur")
+KELOMPOK_TUTUP = ("tanpa", "bertutup", "tutup_asli", "tutup_biru", "tutup_tukar", "campur")
+# 30 Okt: jenis tutup dipisah per sesi (evaluasi tutup v4w): tutup_asli = sewarna cincin; tutup_biru = biru (tua/muda) asli;
+# tutup_tukar = tutup dari botol lain, warna beda dgn cincin. Ketiganya = BERTUTUP (harapan tolak).
+TUTUP_BERTUTUP = ("bertutup", "tutup_asli", "tutup_biru", "tutup_tukar")
 
 
 def harapan_kelompok(isi, tutup):
@@ -126,7 +131,7 @@ def harapan_kelompok(isi, tutup):
     '' = tidak bisa diharapkan (campur). bukan_botol: seharusnya tidak terpindai sama sekali."""
     if isi == "bukan_botol":
         return "bukan_botol"                                   # seharusnya ditolak dengan alasan 'bukan_botol' 
-    if tutup == "bertutup" or isi in ("air_bening", "berwarna") or isi.startswith("air_"):
+    if tutup in TUTUP_BERTUTUP or isi in ("air_bening", "berwarna") or isi.startswith("air_"):
         return "tolak"
     if isi == "kosong" and tutup == "tanpa":
         return "terima"

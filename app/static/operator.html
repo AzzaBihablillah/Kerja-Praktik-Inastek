@@ -146,7 +146,7 @@
   var sim = false, auto = false, active = null, capBuilt = false;
   var ISI = { kosong: 'Kosong', 'air_1-6': 'Air ±1/6', 'air_1-3': 'Air ±1/3', 'air_1-2': 'Air ±1/2', air_penuh: 'Air penuh',
               air_bening: 'Air bening (acak)', berwarna: 'Berwarna', campur: 'Campur', bukan_botol: 'Bukan botol' };
-  var TUTUP = { tanpa: 'Tanpa tutup', bertutup: 'Bertutup', campur: 'Campur' };
+  var TUTUP = { tanpa: 'Tanpa tutup', bertutup: 'Bertutup', tutup_asli: 'Tutup asli (sewarna cincin)', tutup_biru: 'Tutup biru', tutup_tukar: 'Tutup tukaran (beda warna)', campur: 'Campur' };
   var HAR = { terima: 'DITERIMA', tolak: 'DITOLAK', bukan_botol: 'DITOLAK: bukan botol', '': 'tidak bisa diharapkan (campur)' };
   function seg(id, name, keys, labels) {
     $(id).innerHTML = keys.map(function (k, i) {
