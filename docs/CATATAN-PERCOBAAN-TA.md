@@ -527,6 +527,32 @@ Isi v3 menghapus hampir semua salah tolak botol kosong (8 -> 1, sesuai prinsip "
 **Uji aplikasi utuh** (`scripts/alat/uji_app_putar.py`): `app.engine.Machine` asli (deteksi -> berhenti-lalu-pindai -> keputusan -> bonus merek -> catatan DB/CSV) dijalankan dengan KAMERA TIRUAN yang memutar frame diam 469 botol 27 & 29 Okt (talang & PLC dimatikan, data ke folder sementara; zona pemicu = zona periksa karena frame diam = posisi akhir botol). Hasil: 469/469 tercatat, 0 terlewat, 0 ganda, tanpa galat; berhenti per botol median 1,3 s (maks 2,5 s). Keputusan aplikasi **identik 469/469** dengan simulasi `replay_keputusan` memakai model yang sama (varian `aktif_final`) -> simulasi sah mewakili aplikasi. Catatan: benar 467/469 di uji ini BUKAN akurasi (model final aktif sudah melihat foto 27/29 Okt); akurasi sah = validasi per hari (L-32: 461/469).
 **Persiapan sesi berikutnya:** kandidat bayangan kini bisa memakai model TUTUP lain (`app/config.py KANDIDAT['cap']`); set bayangan = sama dengan aktif kecuali tutup = `cap_belt_v4w_kandidat.pt` (final v4w: 28 epoch di Colab, 2 epoch terakhir dilanjutkan di laptop dari checkpoint yang sama, data identik 3.044 foto). Label kelompok baru: `tutup_asli` / `tutup_biru` / `tutup_tukar` (dihitung bertutup). Protokol: `docs/PROTOKOL-SESI-BELT-BERIKUTNYA.md`.
 
+### L-35 Akurasi final set aktif per model & per kategori (30 Okt) — rangkuman untuk bab hasil
+Set aktif: detektor `botol_ver9c`, tutup `cap_belt_v3`, isi `cairan_isi_v3`, merek `merek_coca_v2` (bonus +10), ukuran aturan `panjang`. Semua angka dari botol yang TIDAK ikut dilatih; Wilson 95%. Tutup & isi = validasi per hari lewat jalur aplikasi (720p profil nano, 3 frame diam per botol; `replay_keputusan` varian `semua_baru`). Ringkasan terpisah: `docs/AKURASI-MODEL-FINAL.md`.
+
+| model | kategori | akurasi |
+|---|---|---|
+| Detektor botol (ver9c) | botol asli terdeteksi (sesi 20 Okt) | 117/117 = 100% [97–100] |
+| | benda bukan botol ditolak SISTEM (belt 27 Okt) | 22/22 = 100% [85–100]; detektor langsung 18/22 = 81,8% [61–93], 4 tertolak di tahap tutup/isi |
+| Tutup (v3) | tutup asli (sewarna cincin) | 202/208 = 97,1% [94–99] |
+| | tutup campuran (sebagian ditukar; 29 Okt sesi 110–112, 114 + 2 tutup tukaran 27 Okt) | 139/152 = 91,4% [86–95] |
+| | tanpa tutup (tidak salah dibaca bertutup) | 108/109 = 99,1% [95–100] |
+| Isi cairan (v3, skor isi saja) | kosong | 217/222 = 97,7% [95–99] |
+| | air ±1/6 (satu-satunya kasus air realistis tanpa tutup) | 63/75 = 84,0% [74–91] |
+| | air ±1/2 | 74/75 = 98,7% [93–100] |
+| | air penuh | 46/62 = 74,2% [62–83] |
+| | air acak (27 Okt) | 32/35 = 91,4% [78–97] |
+| Merek (v2; uji sah hanya 29 Okt) | Coca-Cola Company dapat bonus | 108/109 = 99,1% [95–100] |
+| | bukan Coca-Cola tidak dapat bonus | 215/225 = 95,6% [92–98] |
+| Ukuran (aturan panjang) | 26 botol ber-ml, tinggalkan-satu-botol (L-20) | 25/26 = 96,2% [81–99]; belum diuji di sesi belt (tanpa label ml) |
+
+**Keputusan mesin & peran tutup (kejujuran angka).** Semua 247 botol berisi di uji 27/29 Okt bertutup. Alasan tolak: tutup + cairan 203, cairan saja 12, **tutup saja 30** (penuh 16, ±1/6 11, acak 2, ±1/2 1), lolos 2. Maka dilaporkan tiga angka:
+- **98,3% (461/469) [97–99]**, salah terima 7, salah tolak 1 = keputusan mesin pada kondisi uji (botol berisi selalu bertutup); BUKAN kemampuan model air.
+- **91,9% (431/469) [89–94]** = tanpa bantuan tutup: botol berisi benar hanya bila model isi melihat airnya (215/247); botol kosong = keputusan mesin 216/222 (beda dengan 217/222 model isi karena keputusan ikut dipengaruhi tutup).
+- **84,0% (63/75) [74–91]** = kasus nyata air ±1/6 tanpa tutup: ±1 dari 6 botol seperti ini lolos.
+
+Air penuh rendah (74%) dibanding RH 50/62 (McNemar p=0,52, tidak signifikan; 13 vs 9 botol bertukar) dan tidak berdampak pada keputusan karena air penuh selalu bertutup (62/62 ditolak).
+
 ### L-9 Model final
 `datasets/4_eksperimen/cairan/final/` (belt W16 + C13) dan `final2/` (+ pilot dan 28 foto tambahan). Keduanya tidak punya uji bersih; akurasi = hasil CV di atas. Belum dipasang di server (lingkup Capstone 1).
 
