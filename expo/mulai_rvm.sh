@@ -16,7 +16,7 @@ pesan() { zenity --"$1" --width=420 --text="$2" 2>/dev/null || notify-send "RVM"
 if ! docker start rvm_expo >/dev/null; then
     pesan error "Container Docker rvm_expo tidak bisa dijalankan.\nLihat log: $LOG"; exit 1
 fi
-docker exec rvm_expo pkill -f "python3 -m app" 2>/dev/null && sleep 2      # sisa sesi sebelumnya
+docker exec rvm_expo pkill -f "python3 -m app|app_ketahanan" 2>/dev/null && sleep 3      # sisa sesi sebelumnya / uji ketahanan
 
 # 2) kamera: utamakan Logitech C922, selain itu kamera pertama
 CAM=""
