@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=1 Mulai RVM (belt jalan)
+Comment=Mulai RVM untuk expo: konveyor dikendalikan PLC
+Exec=bash /home/jetson/rvm/expo/mulai_rvm.sh plc
+Icon=media-playback-start
+Terminal=false

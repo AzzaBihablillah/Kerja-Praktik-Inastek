@@ -65,7 +65,7 @@ from app.plc import Conveyor
 from app.engine import Machine as Engine
 
 pesan = []
-eng = Engine(DB(path=config.DB_PATH), Conveyor(enabled=False), lambda m: pesan.append(m), sim=False, backend="pytorch", profile="nano")
+eng = Engine(DB(path=config.DB_PATH), Conveyor(enabled=False), lambda m: pesan.append(m), sim=False, backend=os.environ.get("RVM_UJI_BACKEND", "pytorch"), profile="nano")
 eng.start()
 t0 = time.time()
 while eng.status != "siap":

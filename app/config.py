@@ -150,7 +150,7 @@ RECOVER_IDLE_SEC = 120       # sesi tanpa aktivitas selama ini yang belum ditutu
 POINTS_BY_SIZE = {"kecil": 10, "tanggung": 15, "besar": 25}
 POINTS_UNKNOWN_SIZE = 10     # ukuran tak terbaca (botol terpotong tepi frame) -> poin terkecil
 BRAND_BONUS = 10             # 28 Okt (keputusan user, demo): +10 poin untuk botol DITERIMA yang terbaca produk Coca-Cola Company
-BRAND_MODEL = os.path.join(REPO, "datasets", "3_model_final", "merek_coca_v2_kandidat.pt")   # CV 104/107, salah bonus ~1/75 non-Coca
+BRAND_MODEL = os.environ.get("RVM_BRAND_MODEL") or os.path.join(REPO, "datasets", "3_model_final", "merek_coca_v2_kandidat.pt")  # Jetson: engine lewat expo/mulai_rvm.sh   # CV 104/107, salah bonus ~1/75 non-Coca
 # Perkiraan berat botol PET kosong per kategori (gram) untuk angka "plastik terselamatkan".
 GRAMS_BY_SIZE = {"kecil": 14, "tanggung": 20, "besar": 32, "?": 16}
 

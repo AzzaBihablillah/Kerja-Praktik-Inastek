@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=4 Cek RVM
+Comment=Lihat status kamera, PLC, talang, daya
+Exec=bash /home/jetson/rvm/expo/cek_rvm.sh
+Icon=dialog-information
+Terminal=false

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=2 Uji RVM (tanpa belt)
+Comment=Mulai RVM tanpa menggerakkan konveyor
+Exec=bash /home/jetson/rvm/expo/mulai_rvm.sh tanpa_plc
+Icon=applications-system
+Terminal=false

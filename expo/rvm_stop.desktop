@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=3 Stop RVM
+Comment=Hentikan RVM dengan aman
+Exec=bash /home/jetson/rvm/expo/stop_rvm.sh
+Icon=media-playback-stop
+Terminal=false
