@@ -58,5 +58,5 @@ echo "server siap $(date '+%T')"
 # 6) layar kiosk penuh (keluar: Alt+F4)
 pkill -f "chromium-browser.*localhost:8000" 2>/dev/null
 chromium-browser --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble --incognito \
-    --password-store=basic "http://localhost:8000/" >/dev/null 2>&1 &
+    --password-store=basic --lang=id --disable-features=Translate,TranslateUI "http://localhost:8000/" >/dev/null 2>&1 &
 echo "== selesai memulai"
